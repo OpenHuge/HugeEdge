@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "0.1.0",
+  "agentVersion": "0.1.0",
+  "adapter": {
+    "name": "xray-adapter",
+    "compatibilityTarget": "xray-adapter"
+  },
+  "kernel": {
+    "version": "6.8.0",
+    "minimumEbpfKernel": "5.15",
+    "ebpfMode": "userspace"
+  },
+  "capabilities": [
+    {
+      "name": "agent.heartbeat",
+      "version": "0.1.0"
+    }
+  ]
+}

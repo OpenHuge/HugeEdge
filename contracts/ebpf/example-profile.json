@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "0.1.0",
+  "minimumKernel": "5.15",
+  "fallbackMode": "userspace",
+  "probes": [
+    {
+      "name": "tcp-connect",
+      "kind": "tracepoint"
+    }
+  ]
+}

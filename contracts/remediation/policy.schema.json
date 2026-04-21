@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hugeedge.dev/schemas/remediation-policy.json",
+  "title": "HugeEdge Remediation Policy",
+  "type": "object",
+  "required": ["schemaVersion", "name", "mode", "actions"],
+  "properties": {
+    "schemaVersion": { "const": "0.1.0" },
+    "name": { "type": "string" },
+    "mode": { "enum": ["disabled", "manual", "automatic"] },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "enum": ["restart-agent", "disable-plugin", "rotate-token"]
+          }
+        }
+      }
+    }
+  }
+}

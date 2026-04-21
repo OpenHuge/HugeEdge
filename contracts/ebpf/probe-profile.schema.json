@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hugeedge.dev/schemas/ebpf-probe-profile.json",
+  "title": "HugeEdge eBPF Probe Profile",
+  "type": "object",
+  "required": ["schemaVersion", "minimumKernel", "fallbackMode", "probes"],
+  "properties": {
+    "schemaVersion": { "const": "0.1.0" },
+    "minimumKernel": { "const": "5.15" },
+    "fallbackMode": { "enum": ["userspace", "noop"] },
+    "probes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "kind"],
+        "properties": {
+          "name": { "type": "string" },
+          "kind": { "enum": ["kprobe", "tracepoint", "uprobe"] }
+        }
+      }
+    }
+  }
+}

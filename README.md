@@ -1,18 +1,36 @@
 # HugeEdge
 
-HugeEdge is a design-stage specification repository for a composable secure edge access platform.
+HugeEdge is a Phase 0 + Phase 1 monorepo for a composable secure edge access control plane.
 
-The current spec defines a platform with:
+The current codebase initializes:
 
-- a multi-tenant control plane
-- pluggable identity, billing, posture, export, and provider integrations
-- a node agent with runtime-adapter support
-- policy simulation, auditability, rollout governance, and bounded self-healing
+- a modular Go control-plane API
+- thin `worker`, `ext-runtime`, and `agent` binaries
+- a TanStack/Mantine operator shell
+- checked-in OpenAPI, database migrations, and contract schemas
+- local Docker orchestration for Postgres, Redis, NATS JetStream, MinIO, API, worker, extension runtime, and web
 
 ## Status
 
-This repository currently contains specification documents only.
-It does not yet contain implementation code.
+This repository now contains the first implementation skeleton. It is control-plane first and intentionally defers production policy simulation, WASM execution, eBPF loading, billing integrations, and full remediation engines.
+
+## Day-One Commands
+
+```sh
+make setup
+make dev
+pnpm generate
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm validate:capabilities
+pnpm validate:policy-packs
+pnpm validate:wasm-artifacts
+pnpm validate:probe-profiles
+```
+
+The Go toolchain target is `go1.26.2`. If Go is not installed locally, the Docker stack uses the pinned `golang:1.26.2` image.
 
 ## What the Spec Covers
 
@@ -25,6 +43,15 @@ It does not yet contain implementation code.
 - data model and API contracts
 - security, billing, observability, and roadmap
 - implementation-readiness guidance for engineering kickoff
+
+## Implemented Surface
+
+- Auth: JWT-first login, refresh rotation, logout, current actor lookup, bcrypt password hashing, roles and membership schema.
+- Tenancy: tenant list, create, and detail.
+- Fleet: node list/detail, bootstrap token issuance, agent register/renew/heartbeat/capabilities endpoints.
+- System: provider and region seed APIs, capability registry, audit listing.
+- Contracts: capability manifests, `xray-adapter`, WasmEdge plugin manifests, eBPF probe profile fallback modes, remediation policy placeholders.
+- Infra: `golang-migrate` migrations, `sqlc.yaml`, Docker Compose, and GitHub Actions CI.
 
 ## Entry Point
 

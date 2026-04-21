@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hugeedge.dev/schemas/capability-manifest.json",
+  "title": "HugeEdge Capability Manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "agentVersion",
+    "adapter",
+    "kernel",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "0.1.0" },
+    "agentVersion": { "type": "string" },
+    "adapter": {
+      "type": "object",
+      "required": ["name", "compatibilityTarget"],
+      "properties": {
+        "name": { "const": "xray-adapter" },
+        "compatibilityTarget": { "const": "xray-adapter" }
+      }
+    },
+    "kernel": {
+      "type": "object",
+      "required": ["version", "ebpfMode"],
+      "properties": {
+        "version": { "type": "string" },
+        "minimumEbpfKernel": { "const": "5.15" },
+        "ebpfMode": { "enum": ["native", "userspace", "noop"] }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "version"],
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" }
+        }
+      }
+    }
+  }
+}

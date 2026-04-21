@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "default-disabled",
+  "mode": "disabled",
+  "actions": [
+    {
+      "kind": "rotate-token"
+    }
+  ]
+}

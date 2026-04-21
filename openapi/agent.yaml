@@ -1,0 +1,29 @@
+openapi: 3.1.0
+info:
+  title: HugeEdge Agent API
+  version: 0.1.0
+paths:
+  /v1/agent/register:
+    post:
+      operationId: registerAgent
+      responses:
+        "201":
+          description: Registered agent
+  /v1/agent/renew:
+    post:
+      operationId: renewAgent
+      responses:
+        "200":
+          description: Renewed agent lease
+  /v1/agent/heartbeat:
+    post:
+      operationId: heartbeat
+      responses:
+        "202":
+          description: Heartbeat accepted
+  /v1/agent/capabilities:
+    post:
+      operationId: publishCapabilities
+      responses:
+        "202":
+          description: Capabilities accepted

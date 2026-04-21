@@ -1,0 +1,32 @@
+{
+  "name": "@hugeedge/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hugeedge/api-client": "workspace:*",
+    "@hugeedge/config": "workspace:*",
+    "@hugeedge/ui": "workspace:*",
+    "@mantine/core": "9.0.2",
+    "@mantine/hooks": "9.0.2",
+    "@tanstack/react-query": "5.99.2",
+    "@tanstack/react-router": "1.168.23",
+    "@tanstack/react-start": "1.167.42",
+    "lucide-react": "1.8.0",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.0.1",
+    "typescript": "6.0.3",
+    "vite": "8.0.9",
+    "vitest": "4.1.4"
+  }
+}

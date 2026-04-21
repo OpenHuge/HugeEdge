@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hugeedge.dev/schemas/wasm-plugin-manifest.json",
+  "title": "HugeEdge WASM Plugin Manifest",
+  "type": "object",
+  "required": ["schemaVersion", "runtime", "name", "version", "artifact"],
+  "properties": {
+    "schemaVersion": { "const": "0.1.0" },
+    "runtime": { "const": "WasmEdge" },
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "artifact": {
+      "type": "object",
+      "required": ["mediaType", "digest", "signature"],
+      "properties": {
+        "mediaType": { "const": "application/wasm" },
+        "digest": { "type": "string" },
+        "signature": { "type": "string" }
+      }
+    },
+    "desiredState": {
+      "enum": ["installed", "disabled", "removed"]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "0.1.0",
+  "runtime": "WasmEdge",
+  "name": "example-plugin",
+  "version": "0.1.0",
+  "artifact": {
+    "mediaType": "application/wasm",
+    "digest": "sha256:placeholder",
+    "signature": "ed25519:placeholder"
+  },
+  "desiredState": "disabled"
+}
