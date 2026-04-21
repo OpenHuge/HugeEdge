@@ -84,6 +84,9 @@ Responses should include:
 - `POST /v1/admin/nodes/{nodeId}/maintenance/finish`
 - `POST /v1/admin/nodes/{nodeId}/commands`
 - `GET /v1/admin/nodes/{nodeId}/commands`
+- `GET /v1/admin/nodes/{nodeId}/wasm-plugins`
+- `POST /v1/admin/nodes/{nodeId}/wasm-plugins`
+- `POST /v1/admin/nodes/{nodeId}/wasm-plugins/{pluginId}/disable`
 - `GET /v1/admin/regions`
 - `POST /v1/admin/regions`
 - `GET /v1/admin/providers`
@@ -95,6 +98,9 @@ Responses should include:
 - `PATCH /v1/admin/policy-packs/{packId}`
 - `POST /v1/admin/policy-simulations`
 - `GET /v1/admin/policy-simulations/{simulationId}`
+- `GET /v1/admin/risk-policies`
+- `POST /v1/admin/risk-policies`
+- `PATCH /v1/admin/risk-policies/{policyId}`
 - `GET /v1/admin/remediation-policies`
 - `POST /v1/admin/remediation-policies`
 - `PATCH /v1/admin/remediation-policies/{policyId}`
@@ -161,6 +167,7 @@ Responses should include:
 - `POST /v1/app/profiles/{profileId}/download-token`
 - `GET /v1/app/access-requests`
 - `POST /v1/app/access-requests`
+- `POST /v1/app/sessions/{sessionId}/step-up`
 
 ## 8.6 Agent API Endpoints
 
@@ -179,6 +186,7 @@ Responses should include:
 - `POST /v1/agent/capabilities`
 - `GET /v1/agent/runtime/desired`
 - `GET /v1/agent/remediation-policy`
+- `GET /v1/agent/wasm-plugins/desired`
 
 ### Commands
 
@@ -288,6 +296,9 @@ Events:
 - `extension.health_changed`
 - `access_request.approved`
 - `access_request.denied`
+- `session.risk_elevated`
+- `session.step_up_required`
+- `remediation.heuristic_signal_triggered`
 
 Delivery rules:
 
@@ -326,3 +337,14 @@ Event types should include:
 - `remediation.action_failed`
 - `remediation.quarantined`
 - `remediation.escalated`
+
+## 8.14 CARTA and Session Control Contracts
+
+CARTA-related responses should include:
+
+- risk score
+- risk level
+- policy reference
+- evaluation timestamp
+- required session action (`allow`, `step_up`, `restrict`, `terminate`)
+- reason codes

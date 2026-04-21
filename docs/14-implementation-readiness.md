@@ -51,6 +51,8 @@ Each workstream should own:
 The following artifacts should exist before major implementation starts:
 
 - capability manifest schema
+- wasm plugin manifest schema
+- eBPF probe profile schema
 - remediation policy schema
 - node health score model
 - policy simulation request and response schema
@@ -66,6 +68,8 @@ These are still strategic choices, not implementation details:
 - policy expression engine selection
 - whether extension runtime is process-isolated only or network-isolated too
 - initial runtime adapter set
+- initial wasm sandbox/runtime selection
+- initial eBPF footprint and kernel support matrix
 - initial provider adapter set
 - initial posture-provider set
 - default approval model for high-risk remediation
@@ -138,3 +142,16 @@ The first implementation slice should prove:
 - [Cloudflare Access Changelog](https://developers.cloudflare.com/cloudflare-one/changelog/access/)
 - [Cloudflare User Risk Score Selector](https://developers.cloudflare.com/changelog/post/2026-03-04-user-risk-score-access-policies/)
 - [Tailscale Auto-Updates](https://tailscale.com/docs/features/client/update)
+
+## 14.11 Implementation Recommendation
+
+Recommendation: proceed to implementation now, with a constrained first slice.
+
+Required pre-start locks:
+
+1. lock the first runtime adapter and wasm sandbox target
+2. lock deterministic remediation policy contract before optional detector enhancements
+3. lock CARTA response contract (`allow`, `step_up`, `restrict`, `terminate`)
+4. lock plugin signing and rollout verification process
+
+Once these four are approved, implementation should start immediately.

@@ -158,8 +158,8 @@ Use internal workers for:
 
 1. collect subject, device, node, and policy inputs
 2. resolve effective policy and entitlements
-3. evaluate rules and approvals
-4. produce allow or deny plus reasons
+3. evaluate rules, risk inputs, and approvals
+4. produce allow, deny, or degrade plus reasons
 5. persist trace for later explanation where appropriate
 
 ## 4.5 Quota Engine
@@ -364,4 +364,14 @@ Minimum action classes:
 - `require_human_review`
 
 The remediation engine should remain deterministic and policy-driven.
-It should not behave like an opaque AI autopilot.
+It should not behave like an opaque autopilot.
+
+## 4.15 Risk and Automation Governance
+
+If heuristic-assisted detection is enabled, backend contracts should include:
+
+- detector version and policy version references on decisions
+- confidence score and threshold used
+- deterministic fallback path when detector output is unavailable or low-confidence
+- quality telemetry for ongoing validation
+- per-tenant opt-in or opt-out control where commercial policy requires

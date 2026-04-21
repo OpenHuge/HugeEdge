@@ -35,6 +35,9 @@
 - node_groups
 - nodes
 - node_capabilities
+- wasm_plugins
+- node_wasm_plugin_installs
+- ebpf_probe_profiles
 - node_labels
 - node_versions
 - node_certificates
@@ -50,6 +53,7 @@
 - user_policy_overrides
 - device_policy_overrides
 - compiled_configs
+- risk_policies
 - remediation_policies
 - approval_policies
 - simulation_runs
@@ -73,12 +77,14 @@
 - anomaly_events
 - health_events
 - remediation_signals
+- risk_events
 
 ### ops
 - commands
 - command_results
 - remediation_attempts
 - remediation_actions
+- session_control_actions
 - incidents
 - incident_events
 - support_notes
@@ -136,6 +142,7 @@ Fields:
 - agent_version
 - runtime_version
 - runtime_adapter
+- risk_tier
 - config_version
 - cordoned
 - draining
@@ -184,6 +191,30 @@ Fields:
 - cooldown_until
 - escalation_state
 - initiated_by
+- detector_decision_ref
+
+### node_wasm_plugin_installs
+Fields:
+- id
+- node_id
+- plugin_id
+- plugin_version
+- signature_status
+- rollout_id
+- status
+- installed_at
+
+### risk_events
+Fields:
+- id
+- tenant_id
+- subject_type
+- subject_id
+- risk_score
+- risk_level
+- source
+- action_taken
+- observed_at
 
 ### access_requests
 Fields:
@@ -210,6 +241,8 @@ Examples:
 - `traffic_rollups_daily(tenant_id, day desc)`
 - `session_summaries(tenant_id, started_at desc)`
 - `remediation_attempts(node_id, detected_at desc)`
+- `node_wasm_plugin_installs(node_id, installed_at desc)`
+- `risk_events(tenant_id, observed_at desc)`
 - `access_requests(tenant_id, status, created_at desc)`
 - partial index on `subscriptions(status)` where active-ish
 - partial index on `commands(status)` for pending/running

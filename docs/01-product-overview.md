@@ -10,7 +10,7 @@ Build HugeEdge as a composable secure edge access platform that combines:
 - one-click node enrollment and lifecycle management
 - identity-aware and posture-aware access decisions
 - auditable subscription, policy, and operational workflows
-- replaceable integrations and runtime adapters
+- replaceable integrations and runtime adapters via WebAssembly (WASM) extensions
 
 The product is intended for lawful secure remote access, edge runtime orchestration, and managed service scenarios.
 
@@ -102,11 +102,12 @@ HugeEdge should be described in terms of core capabilities and extension capabil
 ### Core platform capabilities
 
 - tenancy and subscription management
-- identity and access orchestration
+- identity and continuous adaptive trust (CARTA) orchestration
 - node fleet and runtime lifecycle management
 - policy compilation and decision explainability
 - usage, quota, billing, and cost visibility
 - observability, audit, and incident workflows
+- policy-driven remediation engine with optional heuristic-based anomaly detection
 
 ### Extension capabilities
 
@@ -119,6 +120,7 @@ HugeEdge should be described in terms of core capabilities and extension capabil
 - data export and webhook sinks
 - UI extensions and policy packs
 - runtime adapters for different edge engines
+- WASM edge plugins for custom traffic inspection and transformation
 
 ## 1.6 Functional Scope
 
@@ -157,7 +159,8 @@ HugeEdge should be described in terms of core capabilities and extension capabil
 
 - SSO and SCIM readiness
 - passkey-ready privileged access
-- device posture and trust signals
+- continuous device posture and adaptive trust signals (CARTA)
+- session kill-switches and dynamic risk scoring
 - JIT or time-bound approval workflows
 - user, device, and workload identity modeling
 
@@ -166,9 +169,10 @@ HugeEdge should be described in terms of core capabilities and extension capabil
 - one-click node enrollment
 - node capability discovery
 - remote commands with governance
-- self-healing and bounded autonomous remediation
+- bounded self-healing and autonomous remediation under explicit policies
 - rollout channels and rollback
 - provider and region-aware orchestration
+- WASM plugin lifecycle management on nodes
 
 ### Policy and profile delivery
 

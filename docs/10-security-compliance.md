@@ -10,6 +10,7 @@
 - safe remote operations
 - disciplined data retention
 - governed extensibility
+- crypto-agility and Post-Quantum Cryptography (PQC) readiness
 
 ## 10.2 Identity and Access
 
@@ -48,6 +49,7 @@
 - outbound calls from connectors should be isolated and observable
 - connector health and recent failures should be visible to operators
 - extension enable and disable events are audited
+- wasm plugin signing and integrity verification are mandatory in production
 
 ## 10.6 Data Protection
 
@@ -56,10 +58,11 @@ At rest:
 - Postgres encryption via managed service or disk encryption
 - object storage encryption
 - secrets in KMS or Vault
+- cryptographic agility to support future PQC algorithms
 
 In transit:
 
-- TLS everywhere
+- TLS everywhere, with PQC-hybrid evaluation on the roadmap where ecosystem support is production-ready
 - HSTS on web
 - mTLS for agent channels
 
@@ -126,6 +129,7 @@ Depending on market:
 - role separation for support versus ops
 - periodic access review
 - exportable evidence for SCIM, approvals, and access decisions
+- transparency for automated remediation and access-denial decisions in applicable regulatory markets
 
 ## 10.11 Secure SDLC
 
@@ -158,3 +162,22 @@ High-risk actions that should default to approval or explicit enablement:
 - certificate authority rotation
 - persistent quarantine
 - destructive data cleanup
+
+## 10.13 WASM and eBPF Controls
+
+For advanced runtime extensibility:
+
+- signed artifacts only
+- runtime sandboxing and resource quotas
+- capability-scoped permissions
+- controlled rollout with canary and rollback
+- immediate disable path for compromised plugins or probes
+
+## 10.14 Automated Decision Governance
+
+Where heuristic or classifier-assisted detection is enabled:
+
+- keep deterministic policy as final enforcement authority
+- persist detector version, confidence, and decision context
+- monitor detector quality and false-positive rates
+- provide operator override and tenant-safe fallback behavior

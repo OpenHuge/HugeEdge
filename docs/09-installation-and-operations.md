@@ -29,6 +29,7 @@ Expected local services:
 - MinIO or local object storage emulator
 - API
 - worker
+- ext-runtime
 - web
 
 ## 9.3 Production Deployment Model
@@ -102,6 +103,7 @@ Store only references where possible:
 - run migrations
 - deploy api
 - deploy worker
+- deploy ext-runtime
 - verify health
 - enable feature flag
 
@@ -158,6 +160,7 @@ Every environment should define:
 - retry budgets by failure class
 - quarantine rules
 - provider replacement policy
+- detector confidence thresholds
 - paging and escalation destinations
 
 Minimum runbooks:
@@ -179,3 +182,6 @@ Before promoting major platform changes:
 3. validate agent and runtime adapter N-2 support
 4. validate rollback path
 5. validate dashboards and alerts for the new capability
+6. validate wasm signature and compatibility checks
+7. validate eBPF safe-mode behavior and rollback
+8. validate deterministic fallback when heuristic detection is unavailable

@@ -21,7 +21,8 @@ The agent is not only a daemon.
 In the refreshed design, it is also a host for:
 
 - runtime adapters
-- telemetry probes
+- WASM-based edge plugins and logic modules
+- optional eBPF-driven low-overhead telemetry probes
 - local capability reporting
 - optional provider-specific hooks that remain outside the core control plane
 
@@ -88,6 +89,8 @@ Directories:
 - `/var/log/platform-agent/`
 - `/opt/platform-runtime/`
 - `/opt/platform-adapters/`
+- `/opt/platform-wasm-plugins/`
+- `/opt/platform-ebpf/`
 
 State kept locally:
 
@@ -105,8 +108,10 @@ Each node should publish a capability manifest such as:
 
 - host OS and architecture
 - installed runtime adapter
+- loaded WASM edge plugins
 - supported command classes
-- telemetry probes available
+- eBPF telemetry probes available
+- artifact signature status
 - posture collection capabilities
 - maintenance and restart semantics
 - upgrade channel
@@ -327,3 +332,14 @@ Rules:
 - the ladder must stop when retry budget is exhausted
 - local actions must preserve last-known-good state where possible
 - the agent must never run arbitrary repair scripts outside approved capability families
+
+## 5.18 WASM and eBPF Runtime Safety Controls
+
+Minimum controls:
+
+- verify plugin and probe signatures before load
+- enforce per-plugin CPU and memory quotas
+- isolate plugin filesystem and network permissions
+- block unapproved host syscalls or privileged operations
+- support immediate disable and unload from control plane
+- report load failures and runtime violations as auditable events

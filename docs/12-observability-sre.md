@@ -6,6 +6,7 @@
 - logs
 - traces
 - events
+- eBPF-driven zero-instrumentation network and system telemetry
 
 ## 12.2 Metrics
 
@@ -54,9 +55,16 @@ Trace:
 - command dispatch
 - billing webhook processing
 
-Use OpenTelemetry everywhere.
+Use OpenTelemetry everywhere, integrated with eBPF as the foundational sensing layer to avoid sidecar/overhead bloat.
 
-## 12.5 Dashboards
+## 12.5 Automated Analytics and Detector Quality
+
+- transition from raw alerts to rule-based Root Cause Analysis (RCA) assistance
+- predictive performance management and network degradation forecasting
+- automatic incident summary and suggested remediation plans based on historical data
+- monitor detector confidence and operator override rates
+
+## 12.6 Dashboards
 
 Required dashboards:
 - API health
@@ -68,7 +76,7 @@ Required dashboards:
 - billing event processing
 - incident board
 
-## 12.6 Alerting
+## 12.7 Alerting
 
 Examples:
 - API p95 latency breach
@@ -80,7 +88,7 @@ Examples:
 - cert expiry under N days
 - billing webhook failures sustained
 
-## 12.7 SLOs
+## 12.8 SLOs
 
 ### Control plane
 - availability 99.9%
@@ -92,7 +100,7 @@ Examples:
 ### Rollout engine
 - 99% rollout task completion success for stable operations
 
-## 12.8 Capacity Planning
+## 12.9 Capacity Planning
 
 Track:
 - tenants
@@ -106,7 +114,7 @@ Track:
 
 Use these for quarterly scaling reviews.
 
-## 12.9 Health Scoring and Remediation Metrics
+## 12.10 Health Scoring and Remediation Metrics
 
 Track:
 
@@ -119,10 +127,18 @@ Track:
 - repeat-failure rate after remediation
 - manual override rate
 
-## 12.10 Self-Healing SLOs
+## 12.11 Self-Healing SLOs
 
 Examples:
 
 - at least 80% of eligible runtime failures recover through bounded automation within 5 minutes
 - less than 5% of automated remediations escalate due to policy or tool failure
 - less than 1% of automated remediations cause customer-visible regression
+
+## 12.12 Detector Quality SLOs
+
+Examples:
+
+- heuristic-assisted remediation suggestions remain below an agreed false-positive threshold
+- deterministic fallback activation is monitored and alertable
+- detector decision telemetry is complete for security and audit review

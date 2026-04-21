@@ -26,6 +26,7 @@ flowchart LR
     G --> S[Node Agents]
     S --> T[Runtime Adapters]
     S --> U[Managed Access Runtime]
+    S --> W[WASM Sandbox / Edge Plugins]
     S --> L
 ```
 
@@ -84,8 +85,9 @@ Stores and serves:
 ### Policy compiler and decision services
 
 - merge plans, identities, posture, policy packs, and overrides
-- produce deterministic effective policy
-- explain allow and deny decisions
+- continuous evaluation of CARTA signals (Continuous Adaptive Risk and Trust Assessment)
+- produce deterministic effective policy and dynamic risk scores
+- explain allow, deny, and degrade decisions
 - support simulation before rollout
 
 ### Workflow and rollout engine
@@ -97,8 +99,10 @@ Stores and serves:
 
 ### Self-healing and resilience engine
 
-- health scoring and policy evaluation
-- remediation planning
+- deterministic rule-based remediation planning
+- optional heuristic anomaly scoring and triage hints
+- continuous policy evaluation against real-time signals
+- remediation planning with dynamic kill-switches
 - cooldown and retry budget tracking
 - quarantine and replacement recommendations
 - incident and audit emission
@@ -151,8 +155,8 @@ Responsible for:
 Responsible for:
 
 - node-agent lifecycle
-- runtime adapters
-- local enforcement
+- runtime adapters and WASM plugin sandbox
+- local enforcement and session kill-switches
 - telemetry capture
 - diagnostics and rollback
 
@@ -183,6 +187,7 @@ Handles:
 Handles:
 
 - runtime process management
+- WASM plugin loading and sandboxing
 - local config fetch and apply
 - health and usage measurement
 - command execution
@@ -214,6 +219,7 @@ Supported capability families:
 - `policy_pack`
 - `ui_extension`
 - `runtime_adapter`
+- `wasm_plugin`
 - `telemetry_probe`
 
 ## 2.8 Plugin and Adapter Boundaries
@@ -279,7 +285,8 @@ Access and operational policy should evaluate over:
 
 Key outputs:
 
-- allow or deny
+- allow, deny, or degrade (e.g., prompt for MFA)
+- dynamic risk score
 - reason codes
 - matched rules
 - required next steps
@@ -316,11 +323,11 @@ Each node runs a node agent that:
 - executes approved commands
 - reports local health and compatibility
 
-Runtime adapters abstract the differences between supported edge engines.
+Runtime adapters abstract the differences between supported edge engines, while the WASM Sandbox provides a safe, multi-language execution environment for custom edge logic without modifying the node agent itself.
 
 ## 2.13 Self-Healing and Resilience Control Loops
 
-Self-healing should be a first-class control loop, not an afterthought in alerting.
+Self-healing should be a first-class control loop with deterministic policy enforcement and optional heuristic signal classification.
 
 Inputs:
 
@@ -358,6 +365,7 @@ Rules:
 - every automated action is audited like a human action
 - risky remediation can require explicit approval
 - no autonomous action may bypass tenant, security, or data-protection guardrails
+- heuristic-assisted recommendations must degrade safely to deterministic policy behavior when unavailable
 
 ## 2.14 Scaling Strategy
 
@@ -432,3 +440,14 @@ These design choices should be treated as current defaults:
 - adapters for providers and runtimes instead of hard-coded branching
 - policy simulation and decision explainability as part of the architecture
 - extension governance enforced by the core, not by convention
+
+## 2.18 Advanced Runtime Safety Boundaries
+
+For WASM plugins and eBPF-based telemetry, treat runtime safety as architecture-level policy:
+
+- signed artifact requirement for plugin and probe packages
+- compatibility checks before deployment
+- tenant-scoped enablement and kill-switch controls
+- strict CPU, memory, and syscall/resource guardrails
+- explicit denylist for unsafe capabilities
+- audit trail for load, unload, and failure events

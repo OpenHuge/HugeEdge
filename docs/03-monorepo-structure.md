@@ -29,6 +29,8 @@ repo/
     schemas/                   # zod schemas and DTO helpers
     config/                    # environment schema and feature flags
     capability-sdk/            # extension manifests, validation, helper libs
+    wasm-sdk/                  # wasm extension contracts and packaging helpers
+    ebpf-schemas/              # probe profiles and telemetry schemas
     policy-packs/              # built-in policy packs and defaults
     integration-contracts/     # connector config schemas and event contracts
     docs/                      # optional local docs tooling
@@ -54,6 +56,7 @@ repo/
     notifications/
     exports/
     runtimes/
+    wasm/
     ui/
   infra/
     docker/
@@ -78,6 +81,7 @@ repo/
 2. Extension packages depend on contracts and SDKs, not on internal core code.
 3. UI extensions must register capability metadata instead of patching routes directly.
 4. Runtime adapters must expose stable manifests and health signals.
+5. WASM and eBPF artifacts must be signed and validated before rollout.
 
 ## 3.4 Backend Code Organization
 
@@ -116,6 +120,7 @@ Guidelines:
 
 - OpenAPI is the source of truth for external APIs
 - capability manifests define extension registration and compatibility
+- wasm manifests and probe profiles are versioned contracts
 - agent protocol can be REST plus signed bundles, with optional streaming later
 - frontend uses generated clients plus capability metadata
 - contract versions are explicit and semantically versioned
@@ -143,6 +148,8 @@ Suggested tasks:
 - `generate`
 - `validate:capabilities`
 - `validate:policy-packs`
+- `validate:wasm-artifacts`
+- `validate:probe-profiles`
 
 Pipeline intent:
 

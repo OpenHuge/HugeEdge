@@ -15,9 +15,9 @@ It does not change the product into a different category. It sharpens the scope:
 Recent secure access and Zero Trust data suggests the category is being reshaped by five forces:
 
 1. Performance and user experience are now board-level problems, not just IT annoyances.
-2. Identity-first and context-aware access are growing, but most teams are still mid-migration.
-3. Teams want fewer consoles but more flexibility, which means composability instead of hard-coded sprawl.
-4. Auditability, SCIM traceability, and approval workflows are now table stakes.
+2. Identity-first and context-aware access are evolving into Continuous Adaptive Trust (CARTA) models.
+3. Teams want fewer consoles but more flexibility, which means composability instead of hard-coded sprawl, including growing interest in WebAssembly (WASM)-based extension models.
+4. Auditability, SCIM traceability, and bounded automation are increasingly expected in enterprise buying cycles.
 5. Passwordless and phishing-resistant authentication is becoming a default expectation for privileged flows.
 
 ## 0.3 External Data Points
@@ -47,17 +47,18 @@ The same 2025 survey reports:
 Implication:
 - the product should centralize control and audit, while keeping integrations modular and replaceable
 
-### Identity-based access is growing, but still incomplete
+### Identity-based access is shifting to Continuous Adaptive Trust
 
-The 2025 Tailscale survey also shows:
+The 2025 Tailscale survey and recent vendor roadmaps also indicate:
 
 - only 29% use identity-based access as their primary model
 - 37% report temporary or time-limited access/JIT access patterns
 - 37% report fully automated identity-based access
-- 24% report device posture management adoption
+- CARTA-style continuous risk evaluation is becoming a common procurement requirement
+- Agentless and BYOD (Bring Your Own Device) access capabilities are frequently requested for contractor and partner workflows
 
 Implication:
-- our vNext spec should treat identity, posture, and JIT approvals as core capabilities, not enterprise add-ons
+- our vNext spec should treat identity, continuous posture assessment, Agentless capability, and JIT approvals as core capabilities, not enterprise add-ons
 
 ### The category is moving toward richer audit and integration surfaces
 
@@ -132,14 +133,14 @@ Implication:
 
 The refreshed spec should treat the following as non-negotiable:
 
-1. A stable core with replaceable integrations.
+1. A stable core with replaceable integrations, including optional WebAssembly (WASM) extension points for edge logic.
 2. A capability registry that makes features discoverable and governable.
 3. Policy-as-data with simulation before rollout.
-4. Identity and posture as inputs into every access decision.
+4. Identity and continuous adaptive posture (CARTA) as decision inputs, including support for session step-up and kill-switch controls.
 5. Time-bound approvals and auditable exceptions for elevated actions.
-6. Export-first architecture for logs, audit, usage, and operational evidence.
-7. A node and runtime model that supports multiple access engines through adapters.
-8. Self-healing should be policy-driven, observable, and easy to disable.
+6. Export-first architecture for logs, audit, usage, and operational evidence, with regulatory alignment for applicable markets.
+7. A node and runtime model that supports multiple access engines through adapters and optional Agentless bridging paths.
+8. Automated self-healing must remain policy-driven, observable, bounded, and easy to disable.
 
 ## 0.6 Updated Product Positioning
 
