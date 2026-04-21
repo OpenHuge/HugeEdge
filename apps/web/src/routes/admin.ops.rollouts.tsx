@@ -1,6 +1,5 @@
-import type { Rollout } from "@hugeedge/api-client";
-import { DataTable, ErrorState, LoadingState, StatusBadge } from "@hugeedge/ui";
 import {
+  Alert,
   Button,
   Code,
   Group,
@@ -9,14 +8,51 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
+import { DataTable } from "@hugeedge/ui";
 import { useDisclosure } from "@mantine/hooks";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { api } from "../lib/api";
+import { useMemo, useState } from "react";
+import { OrderStatusBadge } from "../components/OrderStatusBadge";
 import { formatTimestamp } from "../lib/format";
-import { queryClient } from "../lib/query-client";
-import { queryKeys } from "../lib/session";
+
+type RolloutFixture = {
+  id: string;
+  nodeName: string;
+  bundleVersion: number;
+  status: string;
+  lastApplyStatus: string;
+  healthStatus: string;
+  createdAt: string;
+  completedAt?: string;
+  lastApplyMessage: string;
+  config: Record<string, unknown>;
+};
+
+const rolloutFixtures: RolloutFixture[] = [
+  {
+    id: "rollout-320",
+    nodeName: "bootstrap-node",
+    bundleVersion: 12,
+    status: "succeeded",
+    lastApplyStatus: "succeeded",
+    healthStatus: "online",
+    createdAt: "2026-04-21T00:00:00Z",
+    completedAt: "2026-04-21T00:03:00Z",
+    lastApplyMessage: "Config applied cleanly across baseline adapter settings.",
+    config: { mode: "baseline", profile: "stable" },
+  },
+  {
+    id: "rollout-319",
+    nodeName: "edge-sfo-1",
+    bundleVersion: 11,
+    status: "in_progress",
+    lastApplyStatus: "pending",
+    healthStatus: "registered",
+    createdAt: "2026-04-20T18:45:00Z",
+    lastApplyMessage: "Awaiting next heartbeat before config confirm.",
+    config: { mode: "canary", trafficMirror: true },
+  },
+];
 
 export const Route = createFileRoute("/admin/ops/rollouts")({
   component: RolloutsPage,
@@ -27,48 +63,27 @@ function RolloutsPage() {
     null,
   );
   const [opened, disclosure] = useDisclosure(false);
-  const query = useQuery({
-    queryKey: queryKeys.rollouts,
-    queryFn: () => api.rollouts(),
-  });
-  const detail = useQuery({
-    queryKey: queryKeys.rollout(selectedRolloutId),
-    queryFn: () => api.rollout(String(selectedRolloutId)),
-    enabled: Boolean(selectedRolloutId),
-  });
-  const rollback = useMutation({
-    mutationFn: (rolloutId: string) => api.rollbackRollout(rolloutId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.rollouts }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodes }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.audit }),
-      ]);
-    },
-  });
-
-  if (query.isLoading) {
-    return <LoadingState />;
-  }
-
-  if (query.error) {
-    return (
-      <ErrorState
-        message={
-          query.error instanceof Error
-            ? query.error.message
-            : "Unable to load rollouts"
-        }
-        onRetry={() => void query.refetch()}
-      />
-    );
-  }
+  const selectedRollout = useMemo(
+    () =>
+      rolloutFixtures.find((rollout) => rollout.id === selectedRolloutId) ??
+      null,
+    [selectedRolloutId],
+  );
 
   return (
-    <Stack>
-      <Title order={2}>Rollouts</Title>
-      <DataTable
-        rows={query.data ?? []}
+    <Stack gap="lg">
+      <Stack gap={4}>
+        <Title order={2}>Rollouts</Title>
+      </Stack>
+
+      <Alert color="blue" variant="light">
+        This rollout console is fixture-driven until the published API client
+        catches up with rollout endpoints. Inspect remains available; rollback
+        is a disabled placeholder.
+      </Alert>
+
+      <DataTable<RolloutFixture>
+        rows={rolloutFixtures}
         columns={[
           {
             id: "nodeName",
@@ -84,19 +99,19 @@ function RolloutsPage() {
             id: "status",
             header: "Status",
             accessorFn: (row) => row.status,
-            cell: (row) => <StatusBadge status={row.status} />,
+            cell: (row) => <OrderStatusBadge status={row.status} />,
           },
           {
             id: "lastApplyStatus",
             header: "Last Apply",
-            accessorFn: (row) => row.lastApplyStatus ?? "",
+            accessorFn: (row) => row.lastApplyStatus,
+            cell: (row) => <OrderStatusBadge status={row.lastApplyStatus} />,
           },
           {
             id: "healthStatus",
             header: "Health",
-            accessorFn: (row) => row.healthStatus ?? "",
-            cell: (row) =>
-              row.healthStatus ? <StatusBadge status={row.healthStatus} /> : "",
+            accessorFn: (row) => row.healthStatus,
+            cell: (row) => <OrderStatusBadge status={row.healthStatus} />,
           },
           {
             id: "createdAt",
@@ -126,21 +141,15 @@ function RolloutsPage() {
                 >
                   Inspect
                 </Button>
-                {row.status === "succeeded" ? (
-                  <Button
-                    size="xs"
-                    variant="subtle"
-                    loading={rollback.isPending}
-                    onClick={() => rollback.mutate(row.id)}
-                  >
-                    Rollback
-                  </Button>
-                ) : null}
+                <Button size="xs" variant="subtle" disabled>
+                  Rollback
+                </Button>
               </Group>
             ),
           },
         ]}
       />
+
       <Modal
         opened={opened}
         onClose={disclosure.close}
@@ -148,23 +157,13 @@ function RolloutsPage() {
         centered
         size="lg"
       >
-        {detail.isLoading ? <LoadingState /> : null}
-        {detail.error ? (
-          <ErrorState
-            message={
-              detail.error instanceof Error
-                ? detail.error.message
-                : "Unable to load rollout"
-            }
-          />
-        ) : null}
-        {detail.data ? <RolloutDetail rollout={detail.data} /> : null}
+        {selectedRollout ? <RolloutDetail rollout={selectedRollout} /> : null}
       </Modal>
     </Stack>
   );
 }
 
-function RolloutDetail({ rollout }: { rollout: Rollout }) {
+function RolloutDetail({ rollout }: { rollout: RolloutFixture }) {
   return (
     <Stack>
       <TextInput label="Node" value={rollout.nodeName} readOnly />
@@ -174,17 +173,9 @@ function RolloutDetail({ rollout }: { rollout: Rollout }) {
         readOnly
       />
       <TextInput label="Status" value={rollout.status} readOnly />
-      <TextInput
-        label="Last Apply"
-        value={rollout.lastApplyStatus ?? ""}
-        readOnly
-      />
-      <TextInput
-        label="Message"
-        value={rollout.lastApplyMessage ?? ""}
-        readOnly
-      />
-      <TextInput label="Health" value={rollout.healthStatus ?? ""} readOnly />
+      <TextInput label="Last Apply" value={rollout.lastApplyStatus} readOnly />
+      <TextInput label="Message" value={rollout.lastApplyMessage} readOnly />
+      <TextInput label="Health" value={rollout.healthStatus} readOnly />
       <TextInput
         label="Created"
         value={formatTimestamp(rollout.createdAt)}
@@ -195,7 +186,7 @@ function RolloutDetail({ rollout }: { rollout: Rollout }) {
         value={formatTimestamp(rollout.completedAt)}
         readOnly
       />
-      <Code block>{JSON.stringify(rollout.config ?? {}, null, 2)}</Code>
+      <Code block>{JSON.stringify(rollout.config, null, 2)}</Code>
     </Stack>
   );
 }

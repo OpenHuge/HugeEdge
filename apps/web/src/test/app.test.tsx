@@ -28,6 +28,29 @@ function renderApp(path: string) {
   return { router, ...view };
 }
 
+function installActorOnlyFetchMock() {
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url.endsWith("/v1/app/me")) {
+      return jsonResponse({
+        body: {
+          id: "user-1",
+          email: "admin@hugeedge.local",
+          tenantId: "tenant-1",
+          roleIds: ["owner"],
+          sessionId: "session-1",
+        },
+      });
+    }
+
+    return jsonResponse({ status: 404, body: { error: "not found" } });
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 beforeEach(() => {
   queryClient.clear();
   window.localStorage.clear();
@@ -260,5 +283,52 @@ describe("web app routes", () => {
     expect(await screen.findByDisplayValue("bootstrap-token")).toHaveValue(
       "bootstrap-token",
     );
+  });
+
+  it.each([
+    ["/admin/billing/overview", "Billing Overview"],
+    ["/admin/billing/products", "Catalog Products"],
+    ["/admin/billing/subscriptions", "Subscriptions"],
+    ["/admin/billing/orders", "Orders"],
+    ["/admin/billing/resellers", "Resellers"],
+    ["/admin/billing/invoices", "Invoices"],
+  ])("renders operator billing route %s", async (path, heading) => {
+    tokenStore.setTokens({
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      expiresIn: 900,
+    });
+
+    installActorOnlyFetchMock();
+
+    renderApp(path);
+
+    expect(
+      await screen.findByRole("heading", { name: heading }),
+    ).toBeVisible();
+  });
+
+  it.each([
+    ["/app/store", "Store"],
+    ["/app/subscription", "Subscription"],
+    ["/app/orders", "Orders"],
+    ["/app/invoices", "Invoices"],
+    ["/app/wallet", "Wallet"],
+    ["/app/members", "Members"],
+    ["/app/feeds", "Subscription Feeds"],
+  ])("renders self-service route %s", async (path, heading) => {
+    tokenStore.setTokens({
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      expiresIn: 900,
+    });
+
+    installActorOnlyFetchMock();
+
+    renderApp(path);
+
+    expect(
+      await screen.findByRole("heading", { name: heading }),
+    ).toBeVisible();
   });
 });
