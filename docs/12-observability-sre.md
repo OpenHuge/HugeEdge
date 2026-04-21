@@ -57,6 +57,13 @@ Trace:
 
 Use OpenTelemetry everywhere, integrated with eBPF as the foundational sensing layer to avoid sidecar/overhead bloat.
 
+OpenTelemetry implementation guidance:
+
+- use versioned semantic convention imports (e.g., `semconv/v1.40.0`)
+- specify schema URLs on all resources and instrumentation
+- prefer domain-specific attributes (`server.address`, `client.port`) over deprecated `net.*` namespace
+- monitor OTel Go SDK releases for breaking changes in semantic conventions
+
 ## 12.5 Automated Analytics and Detector Quality
 
 - transition from raw alerts to rule-based Root Cause Analysis (RCA) assistance
@@ -69,12 +76,13 @@ Use OpenTelemetry everywhere, integrated with eBPF as the foundational sensing l
 Required dashboards:
 - API health
 - DB health
-- queue / broker health
+- queue / broker health (NATS JetStream consumer lag critical)
 - node health by region
 - rollout success/failure
 - tenant usage and quota pressure
 - billing event processing
 - incident board
+- AI analytics: predicted degradation hotspots and auto-generated RCA summaries
 
 ## 12.7 Alerting
 

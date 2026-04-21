@@ -17,9 +17,10 @@ This spec now treats it as a composable platform with:
 ## Stack constraints
 
 - Monorepo: Turbo + pnpm
-- Backend: Go
-- Frontend: TanStack Start + Mantine
-- Core priorities: performance, tenant isolation, automation, auditability, composability
+- Backend: Go 1.24+
+- Frontend: TanStack Start v1 + Mantine v9 (React 19.2+)
+- Edge extensibility: WASM (WasmEdge / Wasmtime sandbox) + eBPF telemetry probes
+- Core priorities: performance, tenant isolation, automation, auditability, composability, crypto-agility
 
 ## Reading order
 
@@ -49,9 +50,11 @@ The platform has three logical layers:
 
 ## Design posture
 
-- Control the core, compose the edges
+- Control the core, compose the edges (WASM plugins, runtime adapters, eBPF probes)
 - Model policy as data, not scattered conditionals
-- Prefer explainable and auditable workflows over opaque automation
+- Enforce Continuous Adaptive Trust (CARTA) with graduated session responses
+- Prefer explainable and auditable workflows over opaque automation (EU AI Act ready)
+- Secure the supply chain with TUF-signed binaries and crypto-agility for PQC readiness
 - Keep implementation optional until the design package is approved
 
 ## Non-goals

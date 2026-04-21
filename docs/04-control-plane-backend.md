@@ -38,6 +38,7 @@
 
 - NATS JetStream
 - worker consumers with explicit ack, retry, and DLQ semantics
+- durable pull consumers for flow control under high-throughput telemetry ingestion
 
 ### Background jobs
 
@@ -49,7 +50,7 @@ Use internal workers for:
 - rollout fan-out
 - alert evaluation
 - stale session cleanup
-- SCIM sync reconciliation
+- SCIM sync reconciliation (RFC 9865 cursor-based pagination for large directories)
 - export delivery
 - remediation evaluations
 
@@ -159,7 +160,7 @@ Use internal workers for:
 1. collect subject, device, node, and policy inputs
 2. resolve effective policy and entitlements
 3. evaluate rules, risk inputs, and approvals
-4. produce allow, deny, or degrade plus reasons
+4. produce CARTA-graduated response: `allow`, `step_up` (require MFA), `restrict` (reduce scope), or `terminate` (kill session)
 5. persist trace for later explanation where appropriate
 
 ## 4.5 Quota Engine

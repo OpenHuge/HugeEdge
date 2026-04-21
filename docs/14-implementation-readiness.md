@@ -65,15 +65,17 @@ The following artifacts should exist before major implementation starts:
 
 These are still strategic choices, not implementation details:
 
-- policy expression engine selection
+- policy expression engine selection (CEL recommended, alternatives: Rego, Expr)
 - whether extension runtime is process-isolated only or network-isolated too
-- initial runtime adapter set
-- initial wasm sandbox/runtime selection
-- initial eBPF footprint and kernel support matrix
+- initial runtime adapter set (xray-adapter as default)
+- initial wasm sandbox/runtime selection (WasmEdge or Wasmtime)
+- initial eBPF footprint and kernel support matrix (minimum kernel 5.15 for BTF)
 - initial provider adapter set
 - initial posture-provider set
 - default approval model for high-risk remediation
 - whether replacement workflows are provider-integrated in the first implementation wave
+- PQC migration timeline: when to enable hybrid PQC-TLS for agent channels
+- Agentless bridging strategy for BYOD and contractor access in first release
 
 ## 14.6 Engineering Acceptance Gates
 
@@ -149,9 +151,11 @@ Recommendation: proceed to implementation now, with a constrained first slice.
 
 Required pre-start locks:
 
-1. lock the first runtime adapter and wasm sandbox target
+1. lock the first runtime adapter and wasm sandbox target (recommend WasmEdge for edge-optimized workloads)
 2. lock deterministic remediation policy contract before optional detector enhancements
-3. lock CARTA response contract (`allow`, `step_up`, `restrict`, `terminate`)
-4. lock plugin signing and rollout verification process
+3. lock CARTA response contract (`allow`, `step_up`, `restrict`, `terminate`) with graduated escalation semantics
+4. lock plugin signing and rollout verification process (TUF-based, Ed25519 signatures)
+5. lock tiered passkey deployment model (device-bound for platform admins, synced for operators)
+6. lock eBPF minimum kernel version and graceful degradation strategy
 
-Once these four are approved, implementation should start immediately.
+Once these six items are approved, implementation should start immediately.

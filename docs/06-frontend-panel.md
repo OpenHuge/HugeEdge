@@ -12,15 +12,16 @@
 
 ## 6.2 Stack
 
-- TanStack Start
-- React
-- Mantine
+- TanStack Start v1 (production-ready since March 2026)
+- React 19.2+
+- Mantine v9
 - TanStack Router
 - TanStack Query
+- TanStack Form for complex form workflows
 - Zod for forms and validation
 - ECharts or Recharts for charts
 - Mantine plus TanStack Table for tabular views
-- optional command palette
+- optional command palette (Ctrl+K / Cmd+K)
 
 ## 6.3 App Areas
 
@@ -271,6 +272,13 @@ Structure for i18n from day one:
 - message catalogs
 - locale-aware number and date formatting
 - RTL not required in v1
+
+## 6.12.1 Accessibility
+
+- WCAG 2.2 AA minimum for operator surfaces
+- keyboard-navigable tables and modals
+- screen reader labels for status badges and capability pills
+- high contrast mode support via Mantine theme tokens
 
 ## 6.13 Advanced Operations UX
 

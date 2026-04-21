@@ -16,12 +16,17 @@
 
 - MFA for admin accounts is mandatory
 - privileged flows should support phishing-resistant methods and passkey-ready WebAuthn design
+- tiered passkey deployment strategy:
+  - platform admins and security admins: device-bound passkeys (FIDO2 hardware keys) required
+  - tenant admins and operators: synced passkeys (platform credential managers) acceptable
+  - align with NIST SP 800-63-4 AAL2 for phishing-resistant authenticators
+- consider WebAuthn PRF (Pseudo-Random Function) extension for deriving per-session cryptographic keys
 - RBAC for operator roles
 - scoped API tokens
 - session revocation
 - device-aware login history
 - optional SSO and SAML for enterprise
-- SCIM traceability for user and group lifecycle changes
+- SCIM traceability for user and group lifecycle changes (RFC 9865 cursor-based pagination for large directories)
 
 ## 10.3 Policy and Approval Security
 
@@ -136,9 +141,10 @@ Depending on market:
 - SAST
 - dependency scanning
 - secret scanning
-- signed releases
-- SBOM generation
+- signed releases (TUF for agent binaries, Sigstore for container images)
+- SBOM generation (CycloneDX or SPDX format)
 - image scanning
+- govulncheck in CI for Go dependencies
 - quarterly threat model review
 - security review for new capability families and extension manifests
 

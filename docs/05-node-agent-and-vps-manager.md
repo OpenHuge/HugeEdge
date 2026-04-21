@@ -32,9 +32,10 @@ Provide:
 
 - static Go binary for Linux amd64 and arm64
 - systemd service unit
-- install shell script
+- install shell script with prerequisite checks
 - optional Docker mode for lab and test only
 - RPM and DEB packages later
+- all binaries signed with TUF (The Update Framework) and verifiable via embedded public key
 
 ## 5.4 Supported Platforms
 
@@ -90,6 +91,7 @@ Directories:
 - `/opt/platform-runtime/`
 - `/opt/platform-adapters/`
 - `/opt/platform-wasm-plugins/`
+- `/var/lib/platform-agent/ebpf/`
 - `/opt/platform-ebpf/`
 
 State kept locally:
@@ -118,6 +120,12 @@ Each node should publish a capability manifest such as:
 - current health state
 
 This allows the control plane to avoid pushing incompatible configs or commands.
+
+eBPF probe compatibility requires:
+
+- kernel version >= 5.15 recommended (BTF support)
+- graceful degradation to userspace probes on older kernels
+- probe profiles are versioned contracts, validated before rollout
 
 ## 5.8 Agent State Machine
 
@@ -241,6 +249,14 @@ Health checks:
 - semantic versions for agent and runtime adapters
 - channels: stable, candidate, canary
 - rollout by region, node group, or capability family
+- agent binary self-update via TUF-verified manifest:
+  1. query control plane for update manifest (version, URL, SHA-256, signature)
+  2. download new binary to staging directory
+  3. verify Ed25519 signature against embedded public key
+  4. verify SHA-256 checksum
+  5. atomic rename to replace current binary
+  6. post-restart health check within 30 seconds
+  7. automatic rollback to previous binary if health check fails
 - automatic rollback if:
   - agent fails to reconnect
   - health remains red past threshold

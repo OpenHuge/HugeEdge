@@ -28,7 +28,13 @@ Suggested reading order:
 
 Key shifts in this refresh:
 
-- identity, posture, JIT, and passkey-ready admin security are moved forward
-- architecture is explicitly pluggable and composable
+- identity, posture, CARTA continuous adaptive trust, and tiered passkey admin security are core architecture
+- architecture is explicitly pluggable and composable via WASM edge plugins and eBPF telemetry probes
 - integrations, policy packs, and runtime adapters are treated as first-class extension surfaces
+- agent binary supply chain secured with TUF (The Update Framework) and Ed25519 signing
+- Post-Quantum Cryptography (PQC) readiness and crypto-agility built into the security baseline
+- EU AI Act compliance for AI-driven automated remediation decisions
+- OpenTelemetry with versioned semantic conventions as the observability standard
+- SCIM 2.0 with RFC 9865 cursor-based pagination for enterprise directory sync at scale
+- framework versions pinned: Go 1.24+, TanStack Start v1, Mantine v9, React 19.2+
 - the package remains design-only and does not commit to implementation sequencing beyond the roadmap

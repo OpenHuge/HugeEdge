@@ -4,13 +4,15 @@
 
 - package manager: pnpm
 - task runner and build graph: Turbo
-- backend: Go workspaces or multiple Go modules under `apps/` and `packages/go/`
-- frontend: TanStack Start
+- backend: Go 1.24+ workspaces or multiple Go modules under `apps/` and `packages/go/`
+- frontend: TanStack Start v1 (React 19.2+)
 - shared contracts: OpenAPI plus generated TypeScript clients
 - linting: ESLint plus Biome or Prettier
 - Go linting: golangci-lint
 - CI: GitHub Actions
 - releases: Changesets for JS packages, Goreleaser for Go binaries
+- binary signing: TUF (The Update Framework) for agent binary supply-chain integrity
+- vulnerability scanning: govulncheck integrated into CI
 
 ## 3.2 Repository Layout
 

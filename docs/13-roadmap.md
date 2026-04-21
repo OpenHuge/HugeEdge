@@ -64,15 +64,28 @@ Exit criteria:
 - rollback on bad config works
 - command execution and adapter compatibility are visible in the panel
 - bounded local remediation works for approved failure classes
+- TUF-verified agent self-update works end to end
+
+## Phase 2.5: Edge Extensibility Foundation
+
+- WASM sandbox runtime integration on node agent
+- first WASM plugin build, sign, and deploy pipeline
+- eBPF probe profiles for network and system telemetry
+- kernel compatibility detection and graceful degradation
+
+Exit criteria:
+
+- a sample WASM plugin can be deployed, verified, and loaded on a target node
+- eBPF probes emit OpenTelemetry-compatible telemetry without sidecar overhead
 
 ## Phase 3: Identity, Trust, and Governance
 
 - SSO-ready identity boundary
-- SCIM lifecycle model
-- posture inputs
+- SCIM lifecycle model (RFC 9865 cursor-based pagination)
+- posture inputs and CARTA continuous adaptive trust signals
 - access requests and approvals
 - policy simulation
-- privileged admin MFA and passkey-ready design
+- privileged admin MFA and tiered passkey deployment
 
 Exit criteria:
 
@@ -159,3 +172,7 @@ Exit criteria:
 - cost optimizer for node placement
 - workload and machine identity expansion
 - predictive capacity and failure scoring
+- Agentless access bridging (browser isolation) for BYOD and contractors
+- PQC migration: hybrid PQC-TLS for agent and control plane channels
+- SASE/SSE convergence: SWG and CASB integration surfaces
+- advanced WASM plugin marketplace and third-party ecosystem
