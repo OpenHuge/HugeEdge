@@ -1,44 +1,50 @@
 package platform
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
-	"sort"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	heauth "github.com/hugeedge/hugeedge/internal/auth"
+	platformdb "github.com/hugeedge/hugeedge/internal/platform/db"
+)
+
+var (
+	ErrConflict            = errors.New("conflict")
+	ErrInvalidCredentials  = errors.New("invalid credentials")
+	ErrInvalidRefreshToken = errors.New("invalid refresh token")
+	ErrNotFound            = errors.New("not found")
 )
 
 type Store struct {
-	mu              sync.RWMutex
-	DefaultTenantID string
-	users           map[string]User
-	sessions        map[string]UserSession
-	refreshTokens   map[string]RefreshToken
-	tenants         map[string]Tenant
-	nodes           map[string]Node
-	audit           []AuditLog
-	providers       []Provider
-	regions         []Region
-	capabilities    []Capability
+	db           *pgxpool.Pool
+	queries      *platformdb.Queries
+	capabilities []Capability
+}
+
+type Principal struct {
+	UserID    string
+	Email     string
+	TenantID  string
+	RoleIDs   []string
+	SessionID string
 }
 
 type User struct {
 	ID           string `json:"id"`
 	Email        string `json:"email"`
 	PasswordHash string `json:"-"`
-}
-
-type UserSession struct {
-	ID     string `json:"id"`
-	UserID string `json:"userId"`
-}
-
-type RefreshToken struct {
-	Token     string `json:"token"`
-	SessionID string `json:"sessionId"`
-	UserID    string `json:"userId"`
 }
 
 type Tenant struct {
@@ -90,28 +96,10 @@ type Region struct {
 	Code       string `json:"code"`
 }
 
-func NewStore() *Store {
-	tenantID := uuid.NewString()
-	nodeID := uuid.NewString()
-	providerID := uuid.NewString()
+func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{
-		DefaultTenantID: tenantID,
-		users:           map[string]User{},
-		sessions:        map[string]UserSession{},
-		refreshTokens:   map[string]RefreshToken{},
-		tenants: map[string]Tenant{
-			tenantID: {ID: tenantID, Name: "Default Tenant", Slug: "default", Status: "active", CreatedAt: time.Now()},
-		},
-		nodes: map[string]Node{
-			nodeID: {ID: nodeID, TenantID: tenantID, Name: "bootstrap-node", Status: "ready", AdapterName: "xray-adapter", CreatedAt: time.Now()},
-		},
-		providers: []Provider{{ID: providerID, Name: "Generic VPS", Slug: "generic-vps"}},
-		regions: []Region{{
-			ID:         uuid.NewString(),
-			ProviderID: providerID,
-			Name:       "Local Dev",
-			Code:       "local-dev-1",
-		}},
+		db:      db,
+		queries: platformdb.New(db),
 		capabilities: []Capability{
 			{Name: "agent.register", Version: "0.1.0", Source: "core"},
 			{Name: "adapter.xray", Version: "0.1.0", Source: "xray-adapter"},
@@ -121,122 +109,620 @@ func NewStore() *Store {
 	}
 }
 
-func (s *Store) FindOrCreateUser(email string, password string, passwordHash string) (User, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, user := range s.users {
-		if user.Email == email {
-			return user, user.PasswordHash == "" || heauth.VerifyPassword(user.PasswordHash, password)
+func (s *Store) Ping(ctx context.Context) error {
+	return s.db.Ping(ctx)
+}
+
+func (s *Store) Close() {
+	s.db.Close()
+}
+
+func (s *Store) AuthenticateOrBootstrap(ctx context.Context, email string, password string) (Principal, error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if email == "" || password == "" {
+		return Principal{}, ErrInvalidCredentials
+	}
+
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return Principal{}, err
+	}
+	defer rollback(ctx, tx)
+
+	var userCount int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM users`).Scan(&userCount); err != nil {
+		return Principal{}, err
+	}
+
+	var user User
+	if userCount == 0 {
+		passwordHash, err := heauth.HashPassword(password)
+		if err != nil {
+			return Principal{}, err
+		}
+		principal, err := s.bootstrapFirstAdmin(ctx, tx, email, passwordHash)
+		if err != nil {
+			return Principal{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return Principal{}, err
+		}
+		return principal, nil
+	}
+
+	err = tx.QueryRow(ctx, `SELECT id::text, email, COALESCE(password_hash, '') FROM users WHERE email = $1`, email).
+		Scan(&user.ID, &user.Email, &user.PasswordHash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Principal{}, ErrInvalidCredentials
+	}
+	if err != nil {
+		return Principal{}, err
+	}
+	if !heauth.VerifyPassword(user.PasswordHash, password) {
+		return Principal{}, ErrInvalidCredentials
+	}
+
+	principal, err := s.createSessionPrincipal(ctx, tx, user.ID, user.Email)
+	if err != nil {
+		return Principal{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Principal{}, err
+	}
+	return principal, nil
+}
+
+func (s *Store) bootstrapFirstAdmin(ctx context.Context, tx pgx.Tx, email string, passwordHash string) (Principal, error) {
+	tenantID := uuid.NewString()
+	roleID := uuid.NewString()
+	userID := uuid.NewString()
+	membershipID := uuid.NewString()
+
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO tenants (id, name, slug, status) VALUES ($1, 'Default Tenant', 'default', 'active')`,
+		tenantID,
+	); err != nil {
+		return Principal{}, err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO roles (id, tenant_id, name, permissions) VALUES ($1, $2, 'owner', '["*"]'::jsonb)`,
+		roleID, tenantID,
+	); err != nil {
+		return Principal{}, err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)`,
+		userID, email, passwordHash,
+	); err != nil {
+		return Principal{}, err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO memberships (id, tenant_id, user_id, role_id) VALUES ($1, $2, $3, $4)`,
+		membershipID, tenantID, userID, roleID,
+	); err != nil {
+		return Principal{}, err
+	}
+
+	principal, err := s.createSessionPrincipal(ctx, tx, userID, email)
+	if err != nil {
+		return Principal{}, err
+	}
+	return principal, nil
+}
+
+func (s *Store) createSessionPrincipal(ctx context.Context, tx pgx.Tx, userID string, email string) (Principal, error) {
+	var tenantID string
+	rows, err := tx.Query(ctx,
+		`SELECT m.tenant_id::text, m.role_id::text
+		 FROM memberships m
+		 WHERE m.user_id = $1
+		 ORDER BY m.created_at ASC`,
+		userID,
+	)
+	if err != nil {
+		return Principal{}, err
+	}
+	defer rows.Close()
+
+	roleIDs := []string{}
+	for rows.Next() {
+		var currentTenantID string
+		var roleID string
+		if err := rows.Scan(&currentTenantID, &roleID); err != nil {
+			return Principal{}, err
+		}
+		if tenantID == "" {
+			tenantID = currentTenantID
+		}
+		if currentTenantID == tenantID {
+			roleIDs = append(roleIDs, roleID)
 		}
 	}
-	user := User{ID: uuid.NewString(), Email: email, PasswordHash: passwordHash}
-	s.users[user.ID] = user
-	return user, true
-}
-
-func (s *Store) User(id string) User {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.users[id]
-}
-
-func (s *Store) CreateSession(userID string, tenantID string) UserSession {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	session := UserSession{ID: uuid.NewString(), UserID: userID}
-	s.sessions[session.ID] = session
-	return session
-}
-
-func (s *Store) SaveRefreshToken(token string, sessionID string, userID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.refreshTokens[token] = RefreshToken{Token: token, SessionID: sessionID, UserID: userID}
-}
-
-func (s *Store) RotateRefreshToken(token string) (RefreshToken, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	record, ok := s.refreshTokens[token]
-	if ok {
-		delete(s.refreshTokens, token)
+	if err := rows.Err(); err != nil {
+		return Principal{}, err
 	}
-	return record, ok
-}
-
-func (s *Store) ListTenants() []Tenant {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	tenants := make([]Tenant, 0, len(s.tenants))
-	for _, tenant := range s.tenants {
-		tenants = append(tenants, tenant)
+	if tenantID == "" {
+		return Principal{}, ErrInvalidCredentials
 	}
-	sort.Slice(tenants, func(i int, j int) bool { return tenants[i].CreatedAt.Before(tenants[j].CreatedAt) })
-	return tenants
-}
 
-func (s *Store) CreateTenant(name string, slug string) Tenant {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	tenant := Tenant{ID: uuid.NewString(), Name: name, Slug: slug, Status: "active", CreatedAt: time.Now()}
-	s.tenants[tenant.ID] = tenant
-	return tenant
-}
-
-func (s *Store) Tenant(id string) (Tenant, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	tenant, ok := s.tenants[id]
-	return tenant, ok
-}
-
-func (s *Store) ListNodes() []Node {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	nodes := make([]Node, 0, len(s.nodes))
-	for _, node := range s.nodes {
-		nodes = append(nodes, node)
+	sessionID := uuid.NewString()
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO user_sessions (id, user_id, expires_at) VALUES ($1, $2, $3)`,
+		sessionID, userID, time.Now().Add(24*time.Hour),
+	); err != nil {
+		return Principal{}, err
 	}
-	sort.Slice(nodes, func(i int, j int) bool { return nodes[i].CreatedAt.Before(nodes[j].CreatedAt) })
-	return nodes
+
+	return Principal{
+		UserID:    userID,
+		Email:     email,
+		TenantID:  tenantID,
+		RoleIDs:   roleIDs,
+		SessionID: sessionID,
+	}, nil
 }
 
-func (s *Store) Node(id string) (Node, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	node, ok := s.nodes[id]
-	return node, ok
+func (s *Store) SaveRefreshToken(ctx context.Context, token string, sessionID string) error {
+	_, err := s.db.Exec(ctx,
+		`INSERT INTO refresh_tokens (id, user_session_id, token_hash, expires_at) VALUES ($1, $2, $3, $4)`,
+		uuid.NewString(), sessionID, tokenHash(token), time.Now().Add(30*24*time.Hour),
+	)
+	return err
 }
 
-func (s *Store) RegisterNode() Node {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	node := Node{
-		ID:          uuid.NewString(),
-		TenantID:    s.DefaultTenantID,
-		Name:        fmt.Sprintf("agent-%d", len(s.nodes)+1),
-		Status:      "registered",
-		AdapterName: "xray-adapter",
-		CreatedAt:   time.Now(),
+func (s *Store) RotateRefreshToken(ctx context.Context, token string) (Principal, error) {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return Principal{}, err
 	}
-	s.nodes[node.ID] = node
-	return node
+	defer rollback(ctx, tx)
+
+	var sessionID string
+	var userID string
+	var email string
+	err = tx.QueryRow(ctx,
+		`SELECT us.id::text, u.id::text, u.email
+		 FROM refresh_tokens rt
+		 JOIN user_sessions us ON us.id = rt.user_session_id
+		 JOIN users u ON u.id = us.user_id
+		 WHERE rt.token_hash = $1
+		   AND rt.rotated_at IS NULL
+		   AND rt.expires_at > now()
+		   AND (us.expires_at IS NULL OR us.expires_at > now())
+		 FOR UPDATE`,
+		tokenHash(token),
+	).Scan(&sessionID, &userID, &email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Principal{}, ErrInvalidRefreshToken
+	}
+	if err != nil {
+		return Principal{}, err
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE refresh_tokens SET rotated_at = now() WHERE token_hash = $1`, tokenHash(token)); err != nil {
+		return Principal{}, err
+	}
+
+	principal, err := s.principalForSession(ctx, tx, userID, email, sessionID)
+	if err != nil {
+		return Principal{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Principal{}, err
+	}
+	return principal, nil
 }
 
-func (s *Store) CreateBootstrapToken(tenantID string) BootstrapToken {
-	return BootstrapToken{Token: uuid.NewString(), ExpiresAt: time.Now().Add(1 * time.Hour)}
+func (s *Store) principalForSession(ctx context.Context, tx pgx.Tx, userID string, email string, sessionID string) (Principal, error) {
+	var tenantID string
+	rows, err := tx.Query(ctx,
+		`SELECT m.tenant_id::text, m.role_id::text
+		 FROM memberships m
+		 WHERE m.user_id = $1
+		 ORDER BY m.created_at ASC`,
+		userID,
+	)
+	if err != nil {
+		return Principal{}, err
+	}
+	defer rows.Close()
+
+	roleIDs := []string{}
+	for rows.Next() {
+		var currentTenantID string
+		var roleID string
+		if err := rows.Scan(&currentTenantID, &roleID); err != nil {
+			return Principal{}, err
+		}
+		if tenantID == "" {
+			tenantID = currentTenantID
+		}
+		if currentTenantID == tenantID {
+			roleIDs = append(roleIDs, roleID)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return Principal{}, err
+	}
+	if tenantID == "" {
+		return Principal{}, ErrInvalidRefreshToken
+	}
+	return Principal{UserID: userID, Email: email, TenantID: tenantID, RoleIDs: roleIDs, SessionID: sessionID}, nil
 }
 
-func (s *Store) Audit(action string, actorID string, tenantID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.audit = append(s.audit, AuditLog{ID: uuid.NewString(), Action: action, ActorID: actorID, TenantID: tenantID, CreatedAt: time.Now()})
+func (s *Store) RevokeSession(ctx context.Context, sessionID string) error {
+	_, err := s.db.Exec(ctx,
+		`UPDATE refresh_tokens SET rotated_at = now() WHERE user_session_id = $1 AND rotated_at IS NULL`,
+		sessionID,
+	)
+	return err
 }
 
-func (s *Store) ListAudit() []AuditLog {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := append([]AuditLog(nil), s.audit...)
-	sort.Slice(out, func(i int, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
-	return out
+func (s *Store) User(ctx context.Context, id string) (User, error) {
+	var user User
+	err := s.db.QueryRow(ctx, `SELECT id::text, email, COALESCE(password_hash, '') FROM users WHERE id = $1`, id).
+		Scan(&user.ID, &user.Email, &user.PasswordHash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	return user, err
+}
+
+func (s *Store) ListTenants(ctx context.Context) ([]Tenant, error) {
+	rows, err := s.queries.ListTenants(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tenants := make([]Tenant, 0, len(rows))
+	for _, row := range rows {
+		tenants = append(tenants, Tenant{
+			ID:        uuidString(row.ID),
+			Name:      row.Name,
+			Slug:      row.Slug,
+			Status:    row.Status,
+			CreatedAt: timeFromTimestamptz(row.CreatedAt),
+		})
+	}
+	return tenants, nil
+}
+
+func (s *Store) CreateTenant(ctx context.Context, name string, slug string) (Tenant, error) {
+	var tenant Tenant
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO tenants (id, name, slug, status)
+		 VALUES ($1, $2, $3, 'active')
+		 RETURNING id::text, name, slug, status, created_at`,
+		uuid.NewString(), strings.TrimSpace(name), strings.TrimSpace(slug),
+	).Scan(&tenant.ID, &tenant.Name, &tenant.Slug, &tenant.Status, &tenant.CreatedAt)
+	if isUniqueViolation(err) {
+		return Tenant{}, ErrConflict
+	}
+	return tenant, err
+}
+
+func (s *Store) Tenant(ctx context.Context, id string) (Tenant, error) {
+	tenantID, err := uuidParam(id)
+	if err != nil {
+		return Tenant{}, err
+	}
+	row, err := s.queries.GetTenant(ctx, tenantID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Tenant{}, ErrNotFound
+	}
+	if err != nil {
+		return Tenant{}, err
+	}
+	return Tenant{
+		ID:        uuidString(row.ID),
+		Name:      row.Name,
+		Slug:      row.Slug,
+		Status:    row.Status,
+		CreatedAt: timeFromTimestamptz(row.CreatedAt),
+	}, nil
+}
+
+func (s *Store) ListProviders(ctx context.Context) ([]Provider, error) {
+	rows, err := s.db.Query(ctx, `SELECT id::text, name, slug FROM providers ORDER BY name ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var providers []Provider
+	for rows.Next() {
+		var provider Provider
+		if err := rows.Scan(&provider.ID, &provider.Name, &provider.Slug); err != nil {
+			return nil, err
+		}
+		providers = append(providers, provider)
+	}
+	return providers, rows.Err()
+}
+
+func (s *Store) ListRegions(ctx context.Context) ([]Region, error) {
+	rows, err := s.db.Query(ctx, `SELECT id::text, provider_id::text, name, code FROM regions ORDER BY provider_id, code ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var regions []Region
+	for rows.Next() {
+		var region Region
+		if err := rows.Scan(&region.ID, &region.ProviderID, &region.Name, &region.Code); err != nil {
+			return nil, err
+		}
+		regions = append(regions, region)
+	}
+	return regions, rows.Err()
+}
+
+func (s *Store) ListNodes(ctx context.Context) ([]Node, error) {
+	rows, err := s.queries.ListNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes := make([]Node, 0, len(rows))
+	for _, row := range rows {
+		nodes = append(nodes, Node{
+			ID:          uuidString(row.ID),
+			TenantID:    uuidString(row.TenantID),
+			Name:        row.Name,
+			Status:      row.Status,
+			AdapterName: row.AdapterName,
+			CreatedAt:   timeFromTimestamptz(row.CreatedAt),
+		})
+	}
+	return nodes, nil
+}
+
+func (s *Store) Node(ctx context.Context, id string) (Node, error) {
+	var node Node
+	err := s.db.QueryRow(ctx,
+		`SELECT id::text, tenant_id::text, name, status, adapter_name, created_at FROM nodes WHERE id = $1`,
+		id,
+	).Scan(&node.ID, &node.TenantID, &node.Name, &node.Status, &node.AdapterName, &node.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Node{}, ErrNotFound
+	}
+	return node, err
+}
+
+func (s *Store) CreateBootstrapToken(ctx context.Context, tenantID string) (BootstrapToken, error) {
+	token := uuid.NewString()
+	expiresAt := time.Now().Add(time.Hour)
+	_, err := s.db.Exec(ctx,
+		`INSERT INTO bootstrap_tokens (id, tenant_id, token_hash, expires_at) VALUES ($1, $2, $3, $4)`,
+		uuid.NewString(), tenantID, tokenHash(token), expiresAt,
+	)
+	if err != nil {
+		return BootstrapToken{}, err
+	}
+	return BootstrapToken{Token: token, ExpiresAt: expiresAt}, nil
+}
+
+func (s *Store) ListCapabilities(context.Context) ([]Capability, error) {
+	return append([]Capability(nil), s.capabilities...), nil
+}
+
+func (s *Store) ListAudit(ctx context.Context) ([]AuditLog, error) {
+	rows, err := s.queries.ListAuditLogs(ctx, 100)
+	if err != nil {
+		return nil, err
+	}
+
+	logs := make([]AuditLog, 0, len(rows))
+	for _, row := range rows {
+		logs = append(logs, AuditLog{
+			ID:        uuidString(row.ID),
+			ActorID:   uuidString(row.ActorID),
+			TenantID:  uuidString(row.TenantID),
+			Action:    row.Action,
+			CreatedAt: timeFromTimestamptz(row.CreatedAt),
+		})
+	}
+	return logs, nil
+}
+
+func (s *Store) Audit(ctx context.Context, action string, actorID string, tenantID string) error {
+	_, err := s.db.Exec(ctx,
+		`INSERT INTO audit_logs (id, actor_id, tenant_id, action, metadata) VALUES ($1, nullif($2, '')::uuid, nullif($3, '')::uuid, $4, '{}'::jsonb)`,
+		uuid.NewString(), actorID, tenantID, action,
+	)
+	return err
+}
+
+func (s *Store) RegisterNode(ctx context.Context, bootstrapToken string) (Node, error) {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return Node{}, err
+	}
+	defer rollback(ctx, tx)
+
+	tenantID, err := s.consumeBootstrapToken(ctx, tx, bootstrapToken)
+	if err != nil {
+		return Node{}, err
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM nodes WHERE tenant_id = $1`, tenantID).Scan(&count); err != nil {
+		return Node{}, err
+	}
+
+	var node Node
+	err = tx.QueryRow(ctx,
+		`INSERT INTO nodes (id, tenant_id, name, status, adapter_name)
+		 VALUES ($1, $2, $3, 'registered', 'xray-adapter')
+		 RETURNING id::text, tenant_id::text, name, status, adapter_name, created_at`,
+		uuid.NewString(), tenantID, fmt.Sprintf("agent-%d", count+1),
+	).Scan(&node.ID, &node.TenantID, &node.Name, &node.Status, &node.AdapterName, &node.CreatedAt)
+	if err != nil {
+		return Node{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Node{}, err
+	}
+	return node, nil
+}
+
+func (s *Store) consumeBootstrapToken(ctx context.Context, tx pgx.Tx, bootstrapToken string) (string, error) {
+	if bootstrapToken != "" {
+		var tenantID string
+		err := tx.QueryRow(ctx,
+			`UPDATE bootstrap_tokens
+			 SET used_at = now()
+			 WHERE token_hash = $1
+			   AND used_at IS NULL
+			   AND expires_at > now()
+			 RETURNING tenant_id::text`,
+			tokenHash(bootstrapToken),
+		).Scan(&tenantID)
+		if errors.Is(err, pgx.ErrNoRows) && bootstrapToken != "local-bootstrap" {
+			return "", ErrNotFound
+		}
+		if err == nil {
+			return tenantID, nil
+		}
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return "", err
+		}
+	}
+
+	if bootstrapToken == "local-bootstrap" {
+		var tokenCount int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM bootstrap_tokens WHERE used_at IS NULL AND expires_at > now()`).Scan(&tokenCount); err != nil {
+			return "", err
+		}
+		if tokenCount == 0 {
+			return s.ensureDefaultTenant(ctx, tx)
+		}
+	}
+
+	return "", ErrNotFound
+}
+
+func (s *Store) ensureDefaultTenant(ctx context.Context, tx pgx.Tx) (string, error) {
+	var tenantID string
+	err := tx.QueryRow(ctx, `SELECT id::text FROM tenants ORDER BY created_at ASC LIMIT 1`).Scan(&tenantID)
+	if err == nil {
+		return tenantID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	tenantID = uuid.NewString()
+	_, err = tx.Exec(ctx,
+		`INSERT INTO tenants (id, name, slug, status) VALUES ($1, 'Default Tenant', 'default', 'active')`,
+		tenantID,
+	)
+	if isUniqueViolation(err) {
+		err = tx.QueryRow(ctx, `SELECT id::text FROM tenants WHERE slug = 'default'`).Scan(&tenantID)
+	}
+	return tenantID, err
+}
+
+func (s *Store) RenewNode(ctx context.Context, nodeID string) error {
+	if nodeID == "" {
+		return nil
+	}
+	tag, err := s.db.Exec(ctx, `UPDATE nodes SET status = 'registered' WHERE id = $1`, nodeID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) HeartbeatNode(ctx context.Context, nodeID string) error {
+	if nodeID == "" {
+		return nil
+	}
+	tag, err := s.db.Exec(ctx, `UPDATE nodes SET status = 'ready', last_heartbeat_at = now() WHERE id = $1`, nodeID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) SaveNodeCapabilities(ctx context.Context, nodeID string, manifest map[string]any) error {
+	if nodeID == "" {
+		return nil
+	}
+	capabilities, _ := manifest["capabilities"].([]any)
+	if len(capabilities) == 0 {
+		return nil
+	}
+	manifestJSON, err := json.Marshal(manifest)
+	if err != nil {
+		return err
+	}
+
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer rollback(ctx, tx)
+
+	for _, item := range capabilities {
+		capability, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := capability["name"].(string)
+		version, _ := capability["version"].(string)
+		if name == "" || version == "" {
+			continue
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO node_capabilities (id, node_id, name, version, manifest) VALUES ($1, $2, $3, $4, $5)`,
+			uuid.NewString(), nodeID, name, version, manifestJSON,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+func tokenHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+func rollback(ctx context.Context, tx pgx.Tx) {
+	_ = tx.Rollback(ctx)
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func uuidParam(id string) (pgtype.UUID, error) {
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return pgtype.UUID{}, ErrNotFound
+	}
+	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
+}
+
+func uuidString(value pgtype.UUID) string {
+	if !value.Valid {
+		return ""
+	}
+	return uuid.UUID(value.Bytes).String()
+}
+
+func timeFromTimestamptz(value pgtype.Timestamptz) time.Time {
+	if !value.Valid {
+		return time.Time{}
+	}
+	return value.Time
 }

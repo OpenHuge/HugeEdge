@@ -1,7 +1,8 @@
 PNPM ?= pnpm
 COMPOSE ?= docker compose -f infra/docker/docker-compose.yml
+SQLC_IMAGE ?= sqlc/sqlc:1.31.0
 
-.PHONY: setup dev down generate lint typecheck test build migrate-up
+.PHONY: setup dev down generate lint typecheck test build migrate-up sqlc-generate
 
 setup:
 	corepack enable
@@ -31,3 +32,6 @@ build:
 
 migrate-up:
 	migrate -path db/migrations -database "$$DATABASE_URL" up
+
+sqlc-generate:
+	docker run --rm -v "$$PWD:/src" -w /src $(SQLC_IMAGE) generate

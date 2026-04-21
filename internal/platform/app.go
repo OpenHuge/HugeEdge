@@ -1,8 +1,10 @@
 package platform
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -11,7 +13,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	heauth "github.com/hugeedge/hugeedge/internal/auth"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/cors"
 )
 
@@ -22,7 +24,28 @@ type App struct {
 }
 
 func NewApp(cfg Config) *App {
-	return &App{cfg: cfg, deps: Dependencies{Tracer: BootstrapTelemetry("hugeedge-api")}, store: NewStore()}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("database pool initialization failed", "error", err)
+		panic(err)
+	}
+	app := &App{
+		cfg:   cfg,
+		deps:  Dependencies{DB: pool, Tracer: BootstrapTelemetry("hugeedge-api")},
+		store: NewStore(pool),
+	}
+	if err := app.store.Ping(ctx); err != nil {
+		slog.Error("database ping failed", "error", err)
+		panic(err)
+	}
+	return app
+}
+
+func (a *App) Close() {
+	a.store.Close()
 }
 
 func (a *App) Router() http.Handler {
@@ -69,6 +92,12 @@ func (a *App) health(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *App) ready(w http.ResponseWriter, _ *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := a.store.Ping(ctx); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
@@ -81,24 +110,28 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	passwordHash, err := heauth.HashPassword(req.Password)
+	principal, err := a.store.AuthenticateOrBootstrap(r.Context(), req.Email, req.Password)
+	if errors.Is(err, ErrInvalidCredentials) {
+		writeError(w, http.StatusUnauthorized, err)
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	user, ok := a.store.FindOrCreateUser(req.Email, req.Password, passwordHash)
-	if !ok {
-		writeError(w, http.StatusUnauthorized, errors.New("invalid credentials"))
-		return
-	}
-	session := a.store.CreateSession(user.ID, a.store.DefaultTenantID)
-	tokens, err := a.issueTokens(user.ID, a.store.DefaultTenantID, session.ID, []string{"owner"})
+	tokens, err := a.issueTokens(principal.UserID, principal.TenantID, principal.SessionID, principal.RoleIDs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	a.store.SaveRefreshToken(tokens.RefreshToken, session.ID, user.ID)
-	a.store.Audit("auth.login", user.ID, a.store.DefaultTenantID)
+	if err := a.store.SaveRefreshToken(r.Context(), tokens.RefreshToken, principal.SessionID); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := a.store.Audit(r.Context(), "auth.login", principal.UserID, principal.TenantID); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, tokens)
 }
 
@@ -110,27 +143,48 @@ func (a *App) refresh(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	record, ok := a.store.RotateRefreshToken(req.RefreshToken)
-	if !ok {
+	principal, err := a.store.RotateRefreshToken(r.Context(), req.RefreshToken)
+	if errors.Is(err, ErrInvalidRefreshToken) {
 		writeError(w, http.StatusUnauthorized, errors.New("invalid refresh token"))
 		return
 	}
-	tokens, err := a.issueTokens(record.UserID, a.store.DefaultTenantID, record.SessionID, []string{"owner"})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	a.store.SaveRefreshToken(tokens.RefreshToken, record.SessionID, record.UserID)
+	tokens, err := a.issueTokens(principal.UserID, principal.TenantID, principal.SessionID, principal.RoleIDs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := a.store.SaveRefreshToken(r.Context(), tokens.RefreshToken, principal.SessionID); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, tokens)
 }
 
-func (a *App) logout(w http.ResponseWriter, _ *http.Request) {
+func (a *App) logout(w http.ResponseWriter, r *http.Request) {
+	if claims, ok := a.optionalClaims(r); ok {
+		if err := a.store.RevokeSession(r.Context(), claims.SessionID); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *App) me(w http.ResponseWriter, r *http.Request) {
 	claims := claimsFromContext(r.Context())
-	user := a.store.User(claims.Subject)
+	user, err := a.store.User(r.Context(), claims.Subject)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":        claims.Subject,
 		"email":     user.Email,
@@ -140,8 +194,13 @@ func (a *App) me(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (a *App) listTenants(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.ListTenants())
+func (a *App) listTenants(w http.ResponseWriter, r *http.Request) {
+	tenants, err := a.store.ListTenants(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, tenants)
 }
 
 func (a *App) createTenant(w http.ResponseWriter, r *http.Request) {
@@ -154,36 +213,70 @@ func (a *App) createTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	claims := claimsFromContext(r.Context())
-	tenant := a.store.CreateTenant(req.Name, req.Slug)
-	a.store.Audit("tenant.create", claims.Subject, tenant.ID)
+	tenant, err := a.store.CreateTenant(r.Context(), req.Name, req.Slug)
+	if errors.Is(err, ErrConflict) {
+		writeError(w, http.StatusConflict, errors.New("tenant slug already exists"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := a.store.Audit(r.Context(), "tenant.create", claims.Subject, tenant.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	writeJSON(w, http.StatusCreated, tenant)
 }
 
 func (a *App) getTenant(w http.ResponseWriter, r *http.Request) {
-	tenant, ok := a.store.Tenant(chi.URLParam(r, "tenantId"))
-	if !ok {
+	tenant, err := a.store.Tenant(r.Context(), chi.URLParam(r, "tenantId"))
+	if errors.Is(err, ErrNotFound) {
 		writeError(w, http.StatusNotFound, errors.New("tenant not found"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, tenant)
 }
 
-func (a *App) listProviders(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.providers)
+func (a *App) listProviders(w http.ResponseWriter, r *http.Request) {
+	providers, err := a.store.ListProviders(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, providers)
 }
 
-func (a *App) listRegions(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.regions)
+func (a *App) listRegions(w http.ResponseWriter, r *http.Request) {
+	regions, err := a.store.ListRegions(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, regions)
 }
 
-func (a *App) listNodes(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.ListNodes())
+func (a *App) listNodes(w http.ResponseWriter, r *http.Request) {
+	nodes, err := a.store.ListNodes(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, nodes)
 }
 
 func (a *App) getNode(w http.ResponseWriter, r *http.Request) {
-	node, ok := a.store.Node(chi.URLParam(r, "nodeId"))
-	if !ok {
+	node, err := a.store.Node(r.Context(), chi.URLParam(r, "nodeId"))
+	if errors.Is(err, ErrNotFound) {
 		writeError(w, http.StatusNotFound, errors.New("node not found"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, node)
@@ -191,25 +284,95 @@ func (a *App) getNode(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) createBootstrapToken(w http.ResponseWriter, r *http.Request) {
 	claims := claimsFromContext(r.Context())
-	token := a.store.CreateBootstrapToken(claims.TenantID)
-	a.store.Audit("node.bootstrap_token.create", claims.Subject, claims.TenantID)
+	token, err := a.store.CreateBootstrapToken(r.Context(), claims.TenantID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := a.store.Audit(r.Context(), "node.bootstrap_token.create", claims.Subject, claims.TenantID); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	writeJSON(w, http.StatusCreated, token)
 }
 
-func (a *App) listCapabilities(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.capabilities)
+func (a *App) listCapabilities(w http.ResponseWriter, r *http.Request) {
+	capabilities, err := a.store.ListCapabilities(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, capabilities)
 }
 
-func (a *App) listAudit(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.ListAudit())
+func (a *App) listAudit(w http.ResponseWriter, r *http.Request) {
+	logs, err := a.store.ListAudit(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, logs)
 }
 
 func (a *App) agentRegister(w http.ResponseWriter, r *http.Request) {
-	node := a.store.RegisterNode()
+	var req struct {
+		BootstrapToken string `json:"bootstrapToken"`
+	}
+	if err := decode(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	node, err := a.store.RegisterNode(r.Context(), req.BootstrapToken)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusUnauthorized, errors.New("invalid bootstrap token"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	writeJSON(w, http.StatusCreated, node)
 }
 
-func (a *App) accepted(w http.ResponseWriter, _ *http.Request) {
+func (a *App) accepted(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/v1/agent/renew":
+		var req struct {
+			NodeID string `json:"nodeId"`
+		}
+		if err := decode(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if err := a.store.RenewNode(r.Context(), req.NodeID); err != nil && !errors.Is(err, ErrNotFound) {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	case "/v1/agent/heartbeat":
+		var req struct {
+			NodeID string `json:"nodeId"`
+			Status string `json:"status"`
+		}
+		if err := decode(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if err := a.store.HeartbeatNode(r.Context(), req.NodeID); err != nil && !errors.Is(err, ErrNotFound) {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	case "/v1/agent/capabilities":
+		var manifest map[string]any
+		if err := decode(r, &manifest); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		nodeID, _ := manifest["nodeId"].(string)
+		if err := a.store.SaveNodeCapabilities(r.Context(), nodeID, manifest); err != nil && !errors.Is(err, ErrNotFound) {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -251,6 +414,22 @@ func (a *App) authMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(contextWithClaims(r.Context(), &claims)))
 	})
+}
+
+func (a *App) optionalClaims(r *http.Request) (*HugeEdgeClaims, bool) {
+	header := r.Header.Get("Authorization")
+	tokenText := strings.TrimPrefix(header, "Bearer ")
+	if tokenText == header || tokenText == "" {
+		return nil, false
+	}
+	var claims HugeEdgeClaims
+	token, err := jwt.ParseWithClaims(tokenText, &claims, func(_ *jwt.Token) (any, error) {
+		return []byte(a.cfg.JWTSecret), nil
+	})
+	if err != nil || !token.Valid || claims.TokenType != "access" {
+		return nil, false
+	}
+	return &claims, true
 }
 
 func decode(r *http.Request, out any) error {

@@ -15,6 +15,8 @@ import (
 func main() {
 	cfg := platform.LoadConfig()
 	app := platform.NewApp(cfg)
+	defer app.Close()
+
 	server := &http.Server{
 		Addr:         cfg.HTTPAddr,
 		Handler:      app.Router(),

@@ -50,11 +50,13 @@ jobs:
         with:
           go-version: "1.26.2"
           cache: true
-      - run: go test ./...
-      - run: go build ./apps/api/cmd/api ./apps/worker/cmd/worker ./apps/ext-runtime/cmd/ext-runtime ./apps/agent/cmd/agent
-      - run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.0 generate
       - uses: golang-migrate/migrate-action@v1
         with:
           path: db/migrations
           database: postgres://hugeedge:hugeedge@localhost:5432/hugeedge?sslmode=disable
           command: up
+      - run: docker run --rm -v "$PWD:/src" -w /src sqlc/sqlc:1.31.0 generate
+      - run: go test ./...
+        env:
+          TEST_DATABASE_URL: postgres://hugeedge:hugeedge@localhost:5432/hugeedge?sslmode=disable
+      - run: go build ./apps/api/cmd/api ./apps/worker/cmd/worker ./apps/ext-runtime/cmd/ext-runtime ./apps/agent/cmd/agent

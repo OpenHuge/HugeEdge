@@ -41,6 +41,22 @@ services:
     volumes:
       - minio-data:/data
 
+  migrate:
+    image: migrate/migrate:v4.19.1
+    command:
+      [
+        "-path",
+        "/workspace/db/migrations",
+        "-database",
+        "postgres://hugeedge:hugeedge@postgres:5432/hugeedge?sslmode=disable",
+        "up",
+      ]
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     image: golang:1.26.2
     working_dir: /workspace
@@ -57,6 +73,8 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
