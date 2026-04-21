@@ -9,27 +9,231 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminTenantsRouteImport } from './routes/admin.tenants'
+import { Route as AdminSystemRouteImport } from './routes/admin.system'
+import { Route as AdminOverviewRouteImport } from './routes/admin.overview'
+import { Route as AdminOpsRolloutsRouteImport } from './routes/admin.ops.rollouts'
+import { Route as AdminOpsAuditRouteImport } from './routes/admin.ops.audit'
+import { Route as AdminFleetNodesRouteImport } from './routes/admin.fleet.nodes'
 
-export interface FileRoutesByFullPath {}
-export interface FileRoutesByTo {}
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminTenantsRoute = AdminTenantsRouteImport.update({
+  id: '/tenants',
+  path: '/tenants',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSystemRoute = AdminSystemRouteImport.update({
+  id: '/system',
+  path: '/system',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOverviewRoute = AdminOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOpsRolloutsRoute = AdminOpsRolloutsRouteImport.update({
+  id: '/ops/rollouts',
+  path: '/ops/rollouts',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOpsAuditRoute = AdminOpsAuditRouteImport.update({
+  id: '/ops/audit',
+  path: '/ops/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFleetNodesRoute = AdminFleetNodesRouteImport.update({
+  id: '/fleet/nodes',
+  path: '/fleet/nodes',
+  getParentRoute: () => AdminRoute,
+} as any)
+
+export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/login': typeof LoginRoute
+  '/admin/overview': typeof AdminOverviewRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/tenants': typeof AdminTenantsRoute
+  '/admin/fleet/nodes': typeof AdminFleetNodesRoute
+  '/admin/ops/audit': typeof AdminOpsAuditRoute
+  '/admin/ops/rollouts': typeof AdminOpsRolloutsRoute
+}
+export interface FileRoutesByTo {
+  '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/login': typeof LoginRoute
+  '/admin/overview': typeof AdminOverviewRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/tenants': typeof AdminTenantsRoute
+  '/admin/fleet/nodes': typeof AdminFleetNodesRoute
+  '/admin/ops/audit': typeof AdminOpsAuditRoute
+  '/admin/ops/rollouts': typeof AdminOpsRolloutsRoute
+}
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/login': typeof LoginRoute
+  '/admin/overview': typeof AdminOverviewRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/tenants': typeof AdminTenantsRoute
+  '/admin/fleet/nodes': typeof AdminFleetNodesRoute
+  '/admin/ops/audit': typeof AdminOpsAuditRoute
+  '/admin/ops/rollouts': typeof AdminOpsRolloutsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: never
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/login'
+    | '/admin/overview'
+    | '/admin/system'
+    | '/admin/tenants'
+    | '/admin/fleet/nodes'
+    | '/admin/ops/audit'
+    | '/admin/ops/rollouts'
   fileRoutesByTo: FileRoutesByTo
-  to: never
-  id: '__root__'
+  to:
+    | '/'
+    | '/admin'
+    | '/login'
+    | '/admin/overview'
+    | '/admin/system'
+    | '/admin/tenants'
+    | '/admin/fleet/nodes'
+    | '/admin/ops/audit'
+    | '/admin/ops/rollouts'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/login'
+    | '/admin/overview'
+    | '/admin/system'
+    | '/admin/tenants'
+    | '/admin/fleet/nodes'
+    | '/admin/ops/audit'
+    | '/admin/ops/rollouts'
   fileRoutesById: FileRoutesById
 }
-export interface RootRouteChildren {}
-
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {}
+export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
-const rootRouteChildren: RootRouteChildren = {}
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/tenants': {
+      id: '/admin/tenants'
+      path: '/tenants'
+      fullPath: '/admin/tenants'
+      preLoaderRoute: typeof AdminTenantsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/system': {
+      id: '/admin/system'
+      path: '/system'
+      fullPath: '/admin/system'
+      preLoaderRoute: typeof AdminSystemRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/overview': {
+      id: '/admin/overview'
+      path: '/overview'
+      fullPath: '/admin/overview'
+      preLoaderRoute: typeof AdminOverviewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/ops/rollouts': {
+      id: '/admin/ops/rollouts'
+      path: '/ops/rollouts'
+      fullPath: '/admin/ops/rollouts'
+      preLoaderRoute: typeof AdminOpsRolloutsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/ops/audit': {
+      id: '/admin/ops/audit'
+      path: '/ops/audit'
+      fullPath: '/admin/ops/audit'
+      preLoaderRoute: typeof AdminOpsAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/fleet/nodes': {
+      id: '/admin/fleet/nodes'
+      path: '/fleet/nodes'
+      fullPath: '/admin/fleet/nodes'
+      preLoaderRoute: typeof AdminFleetNodesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+  }
+}
+
+interface AdminRouteChildren {
+  AdminOverviewRoute: typeof AdminOverviewRoute
+  AdminSystemRoute: typeof AdminSystemRoute
+  AdminTenantsRoute: typeof AdminTenantsRoute
+  AdminFleetNodesRoute: typeof AdminFleetNodesRoute
+  AdminOpsAuditRoute: typeof AdminOpsAuditRoute
+  AdminOpsRolloutsRoute: typeof AdminOpsRolloutsRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminOverviewRoute: AdminOverviewRoute,
+  AdminSystemRoute: AdminSystemRoute,
+  AdminTenantsRoute: AdminTenantsRoute,
+  AdminFleetNodesRoute: AdminFleetNodesRoute,
+  AdminOpsAuditRoute: AdminOpsAuditRoute,
+  AdminOpsRolloutsRoute: AdminOpsRolloutsRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  LoginRoute: LoginRoute,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()

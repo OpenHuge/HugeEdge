@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mantine/core": "9.0.2",
+    "@tanstack/react-table": "8.21.3",
     "lucide-react": "1.8.0",
     "react": "19.2.5",
     "react-dom": "19.2.5"
