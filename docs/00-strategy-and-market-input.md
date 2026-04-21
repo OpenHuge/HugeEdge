@@ -148,11 +148,12 @@ Describe HugeEdge as:
 
 - a composable secure edge access platform
 - a multi-tenant control plane for identity-aware access, node orchestration, and policy distribution
-- a platform that unifies fleet, policy, usage, and audit while letting operators plug in identity, billing, posture, and infrastructure providers
+- a platform that unifies fleet, policy, usage, audit, and commercial delivery while letting operators plug in identity, billing, posture, and infrastructure providers
+- a lawful self-service subscription product for individuals, teams, and resellers when deployed with HugeEdge-managed profile delivery
 
 Do not describe it as:
 
-- a generic consumer VPN product
+- a stealth-oriented consumer VPN or circumvention product
 - a stealth or evasion system
 - a monolithic all-in-one replacement for every SSE/SASE domain on day one
 

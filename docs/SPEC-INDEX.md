@@ -29,6 +29,8 @@ Suggested reading order:
 Key shifts in this refresh:
 
 - identity, posture, CARTA continuous adaptive trust, and tiered passkey admin security are core architecture
+- the commercial model is hybrid B2B + B2C with individual, organization, and reseller account types
+- billing moves from plan placeholders to a formal domain with catalog, subscriptions, orders, payments, invoices, wallets, and subscription feeds
 - architecture is explicitly pluggable and composable via WASM edge plugins and eBPF telemetry probes
 - integrations, policy packs, and runtime adapters are treated as first-class extension surfaces
 - agent binary supply chain secured with TUF (The Update Framework) and Ed25519 signing

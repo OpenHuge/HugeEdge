@@ -33,7 +33,8 @@ Exit criteria:
 ## Phase 1: Core Control Plane and Node Inventory
 
 - tenants
-- plans
+- account and tenant foundations
+- basic catalog and entitlement placeholders
 - subscriptions
 - node CRUD
 - bootstrap token issuance
@@ -94,18 +95,25 @@ Exit criteria:
 ## Phase 4: Profiles, Quotas, Billing, and Exports
 
 - profile generation
+- account memberships and seat management
+- catalog products, SKUs, price versions, and entitlement templates
 - device registration
 - traffic rollups
-- plan quota enforcement
+- formal quota enforcement across seats, traffic, devices, sessions, feeds, and runtime minutes
+- checkout preview, orders, payments, invoices, wallets, coupons, and recharge codes
+- reseller accounts, prepaid balance, and settlements
+- subscription feeds and client compatibility manifests
 - billing webhook processing
-- invoice views
+- operator billing console and self-service store
 - export sinks and threshold alerts
 - remediation analytics
 
 Exit criteria:
 
-- tenant self-service is viable
+- individual and organization self-service is viable
+- reseller-assisted activation and renewal are viable
 - quota logic is enforced and auditable
+- a paid subscription can produce a valid subscription feed
 - usage and audit data can be exported cleanly
 
 ## Phase 5: Integrations and Ecosystem
@@ -168,6 +176,7 @@ Exit criteria:
 - reserved node pools
 - multi-region control plane
 - customer-facing status page per tenant
+- richer reseller automation and ERP export adapters
 - richer policy simulation UI
 - cost optimizer for node placement
 - workload and machine identity expansion

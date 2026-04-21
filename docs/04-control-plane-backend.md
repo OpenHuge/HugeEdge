@@ -2,10 +2,11 @@
 
 ## 4.1 Backend Goals
 
-- fast CRUD for tenants, users, nodes, plans, and subscriptions
+- fast CRUD for accounts, tenants, users, catalog items, nodes, and subscriptions
 - resilient async workflows for rollouts, approvals, and remote ops
 - durable audit logs and decision traces
 - predictable quota enforcement
+- backend-owned pricing, settlement, and entitlement calculations
 - composable integration and runtime management
 - simple deployability with clear internal boundaries
 
@@ -45,8 +46,11 @@
 Use internal workers for:
 
 - billing reconciliation
+- invoice issuance and aging
+- wallet and reseller settlement rollups
 - report generation
 - usage rollups
+- inactive seat expiration
 - rollout fan-out
 - alert evaluation
 - stale session cleanup
@@ -67,6 +71,8 @@ Use internal workers for:
 
 ### Tenancy
 
+- accounts
+- account memberships
 - tenants
 - teams
 - roles
@@ -76,12 +82,24 @@ Use internal workers for:
 
 ### Billing
 
-- plans
+- catalog products
+- catalog SKUs
+- price versions
+- entitlement templates
 - subscriptions
+- subscription items
+- orders
+- order items
+- payment intents and attempts
+- payment methods
 - invoices
-- payment events
+- invoice items
+- wallets and credit ledgers
 - credits
-- proration
+- coupons
+- recharge codes
+- reseller accounts, reseller wallet ledger, and settlements
+- proration and renewal previews
 
 ### Fleet
 
@@ -102,7 +120,10 @@ Use internal workers for:
 
 ### Profile
 
+- subscription feeds
+- subscription feed tokens
 - profile artifacts
+- client compatibility manifests
 - device registration
 - credential rotation
 - signed downloads
@@ -172,23 +193,31 @@ Quota dimensions:
 - concurrent sessions
 - active devices
 - seats
+- subscription feed count
+- connector limits
+- allowed regions
+- reserved capacity
+- ephemeral runtime minutes
 - nodes per tenant
 - API rate limit tier
 - extension usage limits where commercialized
 
 Evaluation strategy:
 
-- synchronous check for device, seat, and session counts
+- synchronous check for device, seat, session, and feed-count limits
 - near-real-time usage aggregation for traffic
 - threshold alerts at 70, 85, and 95 percent
 - hard-stop behavior configurable by plan
+- optional carryover only when explicitly enabled on the effective price version
+- inactivity-based seat expiration as a scheduled reclaim path
 - decision traces for quota denials
 
 ## 4.6 Policy Compiler
 
 Inputs:
 
-- tenant plan
+- account, tenant, and subscription state
+- effective catalog entitlements
 - assigned policy packs
 - user, device, and workload overrides
 - posture inputs
@@ -230,6 +259,7 @@ The registry becomes the source for:
 - extension lifecycle operations
 - rollout pre-checks
 - node/runtime compatibility checks
+- client compatibility packaging for subscription feeds
 
 ## 4.8 Command and Rollout Engine
 
@@ -288,6 +318,7 @@ Runtime rules:
 - RFC3339 timestamps in UTC
 - stable machine-readable reason codes
 - no overloaded `status` fields without lifecycle docs
+- clients never calculate final payable amounts; preview and chargeable totals come from backend responses only
 
 ## 4.11 Performance Requirements
 
@@ -298,6 +329,7 @@ Runtime rules:
 - partition large event tables by time
 - stream exports rather than materializing large payloads
 - cache capability manifests and entitlement lookups aggressively
+- isolate pricing and entitlement evaluation behind deterministic service boundaries
 
 ## 4.12 Reliability Patterns
 
@@ -312,8 +344,10 @@ Runtime rules:
 ## 4.13 Security Controls
 
 - all admin actions audited
+- all pricing, entitlement, order, refund, wallet, recharge-code, and feed-token changes audited
 - secrets encrypted at rest
 - per-tenant API token scoping
+- JWT claims include account scope in addition to tenant scope
 - passkey-ready and phishing-resistant admin auth for privileged paths
 - agent bootstrap tokens are one-time and short TTL
 - mTLS between agent and control plane

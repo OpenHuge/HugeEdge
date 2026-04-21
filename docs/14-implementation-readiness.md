@@ -24,6 +24,9 @@ The following decisions should be treated as locked unless a formal architecture
 - policy simulation and decision explainability in v1 architecture
 - bounded self-healing with policy-driven remediation
 - passkey-ready privileged authentication design
+- `account -> tenant -> membership` separation for commercial and RBAC scope
+- billing as a formal Phase 4 domain with catalog, orders, payments, invoices, wallets, and subscription feeds
+- reseller fixed to a two-level model only
 
 ## 14.3 Required Workstreams
 
@@ -33,9 +36,9 @@ Implementation should be decomposed into these workstreams:
 2. Policy and simulation
 3. Fleet, agent, and runtime adapters
 4. Remediation and self-healing
-5. Billing and quotas
+5. Billing, catalog, and quotas
 6. Integrations and extension runtime
-7. Frontend shell and operator surfaces
+7. Frontend shell, operator billing, and self-service surfaces
 8. Observability, audit, and exports
 
 Each workstream should own:
@@ -58,6 +61,9 @@ The following artifacts should exist before major implementation starts:
 - policy simulation request and response schema
 - extension registration schema
 - audit event taxonomy
+- catalog product, SKU, price version, and entitlement schemas
+- checkout preview and order state schemas
+- subscription-feed token and metadata contract
 - runtime adapter interface
 - failure-class taxonomy
 
@@ -76,6 +82,9 @@ These are still strategic choices, not implementation details:
 - whether replacement workflows are provider-integrated in the first implementation wave
 - PQC migration timeline: when to enable hybrid PQC-TLS for agent channels
 - Agentless bridging strategy for BYOD and contractor access in first release
+- first payment-rail mix and which rails are operator-confirmed versus webhook-confirmed
+- invoice PDF generation strategy and tax handling scope by launch market
+- first client compatibility manifests to support in subscription feeds
 
 ## 14.6 Engineering Acceptance Gates
 
@@ -102,8 +111,9 @@ Architecture should not be considered implementation-ready unless all gates are 
 
 ### Product gate
 
-- edition and entitlement boundaries agreed
+- edition, SKU, and entitlement boundaries agreed
 - support and operator flows reviewed
+- self-service billing, refund, and feed-management flows reviewed
 - deny and remediation explanations reviewed
 
 ## 14.7 Definition of Ready for First Build
@@ -128,15 +138,29 @@ The spec package is ready for implementation kickoff when:
 
 The first implementation slice should prove:
 
-- tenant and auth foundations
+- tenant, account, and auth foundations
 - node enrollment
+- individual signup to trial activation
+- checkout preview, order creation, payment confirmation, and subscription activation
+- primary subscription feed creation and token rotation
 - capability manifest ingestion
 - config apply and rollback
 - basic remediation policy with a narrow failure set
 - remediation visibility in UI
-- audit and telemetry for all automated actions
+- audit and telemetry for all automated and commercial actions
 
-## 14.10 Sources Informing This Readiness Pass
+## 14.10 Acceptance Test Emphasis
+
+The first execution plan should explicitly include:
+
+- individual account registration, trial conversion, and feed retrieval
+- organization invite, billable seat lifecycle, and inactive-seat reclaim
+- invoice, wallet, coupon, and mixed-payment settlement behavior
+- manual-payment approval workflow
+- reseller prepaid balance, recharge code, and settlement generation
+- audit coverage for pricing, refunds, feed-token changes, and reseller adjustments
+
+## 14.11 Sources Informing This Readiness Pass
 
 - [Twingate Connector Best Practices](https://www.twingate.com/docs/connector-best-practices)
 - [Twingate Advanced Connector Management](https://www.twingate.com/docs/advanced-connector-management)
@@ -145,7 +169,7 @@ The first implementation slice should prove:
 - [Cloudflare User Risk Score Selector](https://developers.cloudflare.com/changelog/post/2026-03-04-user-risk-score-access-policies/)
 - [Tailscale Auto-Updates](https://tailscale.com/docs/features/client/update)
 
-## 14.11 Implementation Recommendation
+## 14.12 Implementation Recommendation
 
 Recommendation: proceed to implementation now, with a constrained first slice.
 

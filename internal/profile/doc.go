@@ -1,3 +1,3 @@
 package profile
 
-// Package profile is contract-only in initialization.
+// Package profile owns profile artifacts, subscription feeds, and client delivery manifests.

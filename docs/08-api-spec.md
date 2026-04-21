@@ -2,7 +2,8 @@
 
 ## 8.1 API Sets
 
-- Public and tenant API
+- Public delivery API
+- App or self-service API
 - Admin API
 - Agent API
 - Extensibility API
@@ -20,7 +21,7 @@ Version all external APIs under `/v1`.
 ### API clients
 
 - bearer API token
-- scoped access by tenant, capability family, and action
+- scoped access by account, tenant, capability family, and action
 
 ### Privileged admin
 
@@ -31,6 +32,23 @@ Version all external APIs under `/v1`.
 
 - bootstrap token for first registration
 - mTLS plus signed agent token thereafter
+
+### JWT Claims
+
+Retain:
+
+- `sub`
+- `tenant_id`
+- `role_ids`
+- `session_id`
+- `token_type`
+- `exp`
+
+Add:
+
+- `account_id`
+- `account_role_ids`
+- `billing_scope`
 
 ## 8.3 Capability Discovery
 
@@ -54,6 +72,12 @@ Responses should include:
 
 ## 8.4 Admin API Endpoints
 
+### Accounts and commercial roles
+
+- `GET /v1/admin/accounts`
+- `POST /v1/admin/accounts`
+- `PATCH /v1/admin/accounts`
+
 ### Tenants
 
 - `GET /v1/admin/tenants`
@@ -63,13 +87,32 @@ Responses should include:
 - `POST /v1/admin/tenants/{tenantId}/suspend`
 - `POST /v1/admin/tenants/{tenantId}/resume`
 
-### Plans and billing
+### Catalog and billing
 
-- `GET /v1/admin/plans`
-- `POST /v1/admin/plans`
-- `PATCH /v1/admin/plans/{planId}`
+- `GET /v1/admin/catalog/products`
+- `POST /v1/admin/catalog/products`
+- `PATCH /v1/admin/catalog/products`
+- `GET /v1/admin/catalog/skus`
+- `POST /v1/admin/catalog/skus`
+- `PATCH /v1/admin/catalog/skus`
+- `GET /v1/admin/catalog/price-versions`
+- `POST /v1/admin/catalog/price-versions`
+- `PATCH /v1/admin/catalog/price-versions`
+- `GET /v1/admin/subscriptions`
+- `GET /v1/admin/subscriptions/{subscriptionId}`
+- `POST /v1/admin/subscriptions/{subscriptionId}/suspend`
+- `POST /v1/admin/subscriptions/{subscriptionId}/resume`
+- `POST /v1/admin/subscriptions/{subscriptionId}/cancel`
 - `POST /v1/admin/subscriptions/{subscriptionId}/adjust`
-- `POST /v1/admin/coupons`
+- `GET /v1/admin/orders`
+- `GET /v1/admin/orders/{orderId}`
+- `POST /v1/admin/orders/{orderId}/approve-payment`
+- `POST /v1/admin/orders/{orderId}/refund`
+- `GET /v1/admin/invoices`
+- `GET /v1/admin/resellers`
+- `POST /v1/admin/resellers`
+- `POST /v1/admin/resellers/{resellerId}/wallet/adjust`
+- `POST /v1/admin/recharge-codes`
 
 ### Fleet
 
@@ -135,7 +178,7 @@ Responses should include:
 - `POST /v1/admin/incidents`
 - `POST /v1/admin/incidents/{incidentId}/events`
 
-## 8.5 Tenant API Endpoints
+## 8.5 App and Self-Service API Endpoints
 
 ### Account
 
@@ -145,11 +188,28 @@ Responses should include:
 - `POST /v1/app/mfa/verify`
 - `POST /v1/app/passkeys/register`
 
-### Subscription and usage
+### Billing, catalog, and checkout
 
-- `GET /v1/app/subscription`
-- `GET /v1/app/usage`
+- `GET /v1/app/billing/overview`
+- `GET /v1/app/catalog/products`
+- `POST /v1/app/checkout/preview`
+- `POST /v1/app/orders`
+- `GET /v1/app/orders`
+- `GET /v1/app/orders/{orderId}`
+- `POST /v1/app/orders/{orderId}/pay`
+- `GET /v1/app/subscriptions`
+- `GET /v1/app/subscriptions/{subscriptionId}`
+- `POST /v1/app/subscriptions/{subscriptionId}/renew`
+- `POST /v1/app/subscriptions/{subscriptionId}/cancel-auto-renew`
 - `GET /v1/app/invoices`
+- `GET /v1/app/wallet`
+- `POST /v1/app/recharge-codes/redeem`
+- `GET /v1/app/usage`
+
+### Members and seats
+
+- `GET /v1/app/members`
+- `POST /v1/app/members/invite`
 
 ### Users and devices
 
@@ -165,11 +225,35 @@ Responses should include:
 - `GET /v1/app/profiles/{profileId}`
 - `POST /v1/app/profiles/{profileId}/rotate`
 - `POST /v1/app/profiles/{profileId}/download-token`
+- `GET /v1/app/subscription-feeds`
+- `POST /v1/app/subscription-feeds`
+- `POST /v1/app/subscription-feeds/{feedId}/rotate`
+- `POST /v1/app/subscription-feeds/{feedId}/revoke`
 - `GET /v1/app/access-requests`
 - `POST /v1/app/access-requests`
 - `POST /v1/app/sessions/{sessionId}/step-up`
 
-## 8.6 Agent API Endpoints
+## 8.6 Public Delivery API
+
+- `GET /v1/sub/{token}`
+- `HEAD /v1/sub/{token}`
+
+Feed delivery requirements:
+
+- return HugeEdge profile bundles, client metadata, and usage/expiration information
+- support ETag and Last-Modified
+- support token rotation and revoke
+- support optional device binding checks
+- expose delivery metadata in headers:
+  - `X-HE-Plan`
+  - `X-HE-Usage`
+  - `X-HE-Total`
+  - `X-HE-Expire-At`
+  - `X-HE-Status`
+  - `X-HE-Notice`
+  - `X-HE-ETag`
+
+## 8.7 Agent API Endpoints
 
 ### Enrollment
 
@@ -198,7 +282,39 @@ Responses should include:
 - `GET /v1/agent/config/current`
 - `POST /v1/agent/config/applied`
 
-## 8.7 Example Admin Node Detail Response
+## 8.8 Example Checkout Preview Response
+
+```json
+{
+  "currency": "USD",
+  "items": [
+    {
+      "skuId": "sku_team_monthly",
+      "type": "base_subscription",
+      "quantity": 1,
+      "subtotalMinor": 1500
+    },
+    {
+      "skuId": "sku_traffic_pack_100g",
+      "type": "traffic_pack",
+      "quantity": 1,
+      "subtotalMinor": 500
+    }
+  ],
+  "discountMinor": 300,
+  "creditAppliedMinor": 200,
+  "walletAppliedMinor": 400,
+  "payableMinor": 1100,
+  "paymentSequence": [
+    "coupon",
+    "credit",
+    "wallet",
+    "external_payment"
+  ]
+}
+```
+
+## 8.9 Example Admin Node Detail Response
 
 ```json
 {
@@ -224,7 +340,7 @@ Responses should include:
 }
 ```
 
-## 8.8 Example Policy Simulation Request
+## 8.10 Example Policy Simulation Request
 
 ```json
 {
@@ -251,7 +367,7 @@ Responses should include:
 }
 ```
 
-## 8.9 Example Error Model
+## 8.11 Example Error Model
 
 ```json
 {
@@ -273,7 +389,7 @@ Rules:
 - optional `details`
 - include trace ID in headers
 
-## 8.10 Pagination
+## 8.12 Pagination
 
 Cursor format:
 
@@ -281,13 +397,21 @@ Cursor format:
 - `limit` default 20, max 200
 - explicit sort order
 
-## 8.11 Webhooks and Exports
+## 8.13 Webhooks and Exports
 
 Events:
 
 - `subscription.created`
 - `subscription.updated`
+- `order.created`
+- `order.paid`
+- `payment.failed`
 - `invoice.paid`
+- `invoice.overdue`
+- `feed.rotated`
+- `feed.revoked`
+- `recharge_code.redeemed`
+- `reseller.settlement.issued`
 - `tenant.suspended`
 - `node.online`
 - `node.offline`
@@ -307,14 +431,15 @@ Delivery rules:
 - idempotent event IDs
 - destination-specific dead-letter visibility
 
-## 8.12 API Design Constraints
+## 8.14 API Design Constraints
 
 - external APIs must remain capability-discoverable
 - no client should assume an extension exists unless discovery says so
 - long-running operations return task IDs
 - simulation and explanation endpoints are part of the API contract, not debug-only features
+- clients never send trusted final totals for orders, invoices, or renewals
 
-## 8.13 Remediation and Self-Healing APIs
+## 8.15 Remediation and Self-Healing APIs
 
 Required response fields for remediation resources:
 

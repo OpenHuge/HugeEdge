@@ -132,6 +132,7 @@ Must remain stable and opinionated:
 
 - identity
 - tenancy
+- commerce
 - billing
 - fleet
 - policy
@@ -167,10 +168,12 @@ Responsible for:
 Handles:
 
 - accounts and tenancy
-- plans and entitlements
+- catalog, pricing, and entitlements
+- subscriptions, orders, invoices, wallets, and reseller settlement
 - policies and decision inputs
 - node inventory and runtime orchestration
 - approvals, audit, and reporting
+- subscription-feed and profile-artifact delivery
 - extension lifecycle and configuration
 
 ### Extension plane
@@ -180,6 +183,7 @@ Handles:
 - ingress from external systems
 - outbound webhooks and exports
 - third-party posture, billing, and provider APIs
+- client compatibility manifests and optional feed packaging adapters
 - policy pack and UI metadata registration
 
 ### Data / execution plane
@@ -218,6 +222,7 @@ Supported capability families:
 - `export_sink`
 - `policy_pack`
 - `ui_extension`
+- `client_packager`
 - `runtime_adapter`
 - `wasm_plugin`
 - `telemetry_probe`
@@ -278,7 +283,7 @@ Access and operational policy should evaluate over:
 - device identity
 - device posture
 - workload identity
-- tenant and plan entitlements
+- account, tenant, and subscription entitlements
 - node/runtime capability
 - approval context
 - time and region
@@ -291,6 +296,7 @@ Key outputs:
 - matched rules
 - required next steps
 - artifact version for the decision basis
+- commercial impact markers where entitlement or quota state affects the result
 
 ## 2.11 Config Distribution Model
 

@@ -11,22 +11,36 @@
 - api_tokens
 
 ### tenancy
+- accounts
+- account_memberships
 - tenants
-- organizations
 - memberships
 - roles
 - role_bindings
+- seat_allocations
 - feature_flags
 
 ### billing
-- plans
-- plan_versions
+- catalog_products
+- catalog_skus
+- price_versions
+- entitlement_templates
 - subscriptions
+- subscription_items
+- orders
+- order_items
+- payment_intents
+- payment_attempts
+- payment_methods
 - invoices
 - invoice_items
-- payment_events
+- wallets
+- credit_ledger
 - coupons
-- credits
+- recharge_codes
+- reseller_accounts
+- reseller_wallet_ledger
+- reseller_settlements
 - usage_periods
 
 ### fleet
@@ -60,6 +74,10 @@
 
 ### access
 - profiles
+- subscription_feeds
+- subscription_feed_tokens
+- profile_artifacts
+- client_compat_manifests
 - profile_versions
 - device_registrations
 - credentials
@@ -98,15 +116,48 @@
 
 ## 7.2 Important Entity Notes
 
+### accounts
+Fields:
+- id
+- type (`individual | organization | reseller`)
+- name
+- status
+- default_tenant_id
+- billing_email
+- price_tier
+- tax_profile
+- created_at
+- updated_at
+
+Notes:
+- every commercial customer is an account
+- an individual account auto-creates a personal tenant
+- an organization account may own multiple tenants over time
+- reseller accounts can own downstream customers but never other resellers
+
+### account_memberships
+Fields:
+- id
+- account_id
+- user_id
+- role_id
+- invited_by
+- joined_at
+- expires_at
+
+Notes:
+- commercial access is modeled separately from tenant RBAC
+- account roles include `account_owner`, `billing_admin`, `account_admin`, and `member`
+- reseller roles include `reseller_owner`, `reseller_operator`, and `reseller_finance`
+
 ### tenants
 Fields:
 - id
+- account_id
 - slug
 - name
 - status
 - owner_user_id
-- billing_customer_ref
-- plan_id
 - timezone
 - created_at
 - updated_at
@@ -114,15 +165,214 @@ Fields:
 ### subscriptions
 Fields:
 - id
+- account_id
 - tenant_id
-- plan_version_id
+- base_product_id
 - billing_cycle
 - status
+- auto_renew
 - renews_at
 - current_period_start
 - current_period_end
 - hard_cap_behavior
 - source
+
+Notes:
+- at most one base subscription may be active per account or tenant billing scope at a time
+- add-ons are expressed through `subscription_items`
+- traffic defaults to reset per billing period without carryover unless enabled by `price_versions`
+
+### subscription_items
+Fields:
+- id
+- subscription_id
+- sku_id
+- item_type
+- quantity
+- entitlement_snapshot
+- period_start
+- period_end
+
+Supported `item_type` values:
+- `base_subscription`
+- `traffic_pack`
+- `seat_pack`
+- `device_pack`
+- `region_pack`
+- `connector_pack`
+- `support_addon`
+
+### price_versions
+Fields:
+- id
+- sku_id
+- currency
+- billing_interval
+- billing_interval_count
+- tax_class
+- visibility_scope
+- sales_channel
+- unit_amount
+- reseller_unit_amount
+- carryover_enabled
+- effective_from
+- effective_to
+
+### wallets
+Fields:
+- id
+- account_id
+- currency
+- balance_minor
+- status
+- created_at
+- updated_at
+
+### credit_ledger
+Fields:
+- id
+- account_id
+- wallet_id
+- source_type
+- delta_minor
+- balance_after_minor
+- order_id
+- invoice_id
+- created_at
+
+### orders
+Fields:
+- id
+- account_id
+- tenant_id
+- status
+- currency
+- subtotal_minor
+- discount_minor
+- credit_applied_minor
+- wallet_applied_minor
+- payable_minor
+- payment_status
+- created_at
+- expires_at
+
+States:
+- `draft`
+- `pending_payment`
+- `paid`
+- `activating`
+- `active`
+- `canceled`
+- `expired`
+- `refunded`
+
+### payment_intents
+Fields:
+- id
+- order_id
+- channel
+- status
+- amount_minor
+- external_ref
+- requires_manual_confirmation
+- created_at
+- updated_at
+
+Supported `channel` values:
+- `stripe_card`
+- `paypal`
+- `crypto`
+- `bank_transfer`
+- `wallet_balance`
+- `recharge_code`
+
+### invoices
+Fields:
+- id
+- account_id
+- order_id
+- subscription_id
+- status
+- currency
+- subtotal_minor
+- tax_minor
+- total_minor
+- issued_at
+- due_at
+- paid_at
+
+States:
+- `draft`
+- `issued`
+- `paid`
+- `void`
+- `refunded`
+- `overdue`
+
+### reseller_accounts
+Fields:
+- id
+- reseller_account_id
+- customer_account_id
+- status
+- pricing_policy
+- settlement_term
+- created_at
+- updated_at
+
+### recharge_codes
+Fields:
+- id
+- reseller_account_id
+- code
+- currency
+- face_value_minor
+- status
+- redeemed_by_account_id
+- expires_at
+- redeemed_at
+
+### subscription_feeds
+Fields:
+- id
+- subscription_id
+- account_id
+- tenant_id
+- status
+- label
+- device_binding_mode
+- expires_at
+- last_published_at
+- created_at
+
+### subscription_feed_tokens
+Fields:
+- id
+- feed_id
+- token_hash
+- status
+- last_used_at
+- rotated_from_token_id
+- revoked_at
+- expires_at
+
+### profile_artifacts
+Fields:
+- id
+- feed_id
+- profile_id
+- format
+- etag
+- artifact_path
+- generated_at
+
+### client_compat_manifests
+Fields:
+- id
+- artifact_id
+- client_family
+- metadata_jsonb
+- generated_at
 
 ### nodes
 Fields:
@@ -233,10 +483,19 @@ Fields:
 ## 7.3 Indexing Strategy
 
 Examples:
+- `accounts(type, created_at desc)`
+- `account_memberships(account_id, user_id)`
 - `nodes(status, region_id, updated_at desc)`
 - `nodes(quarantine_state, health_score, updated_at desc)`
 - `node_heartbeats(node_id, observed_at desc)`
 - `node_health_scores(node_id, observed_at desc)`
+- `subscriptions(account_id, status, current_period_end desc)`
+- `subscription_items(subscription_id, item_type)`
+- `orders(account_id, created_at desc)`
+- `payment_intents(order_id, status)`
+- `invoices(account_id, status, issued_at desc)`
+- `recharge_codes(reseller_account_id, status, expires_at desc)`
+- `subscription_feed_tokens(feed_id, status)`
 - `audit_logs(target_type, target_id, created_at desc)`
 - `traffic_rollups_daily(tenant_id, day desc)`
 - `session_summaries(tenant_id, started_at desc)`
@@ -275,11 +534,20 @@ Suggested defaults:
 
 ```mermaid
 erDiagram
-    TENANTS ||--o{ SUBSCRIPTIONS : has
+    ACCOUNTS ||--o{ ACCOUNT_MEMBERSHIPS : has
+    ACCOUNTS ||--o{ TENANTS : owns
+    ACCOUNTS ||--o{ SUBSCRIPTIONS : billed_by
+    ACCOUNTS ||--o{ ORDERS : places
+    ACCOUNTS ||--o{ INVOICES : billed
+    ACCOUNTS ||--|| WALLETS : owns
+    SUBSCRIPTIONS ||--o{ SUBSCRIPTION_ITEMS : contains
+    SUBSCRIPTIONS ||--o{ SUBSCRIPTION_FEEDS : delivers
     TENANTS ||--o{ MEMBERSHIPS : has
     TENANTS ||--o{ PROFILES : owns
     TENANTS ||--o{ DEVICE_REGISTRATIONS : owns
     TENANTS ||--o{ TRAFFIC_ROLLUPS_DAILY : consumes
+    SUBSCRIPTION_FEEDS ||--o{ SUBSCRIPTION_FEED_TOKENS : secures
+    SUBSCRIPTION_FEEDS ||--o{ PROFILE_ARTIFACTS : publishes
     REGIONS ||--o{ NODES : contains
     PROVIDERS ||--o{ NODES : hosts
     NODES ||--o{ COMMANDS : receives

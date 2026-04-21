@@ -10,6 +10,7 @@ HugeEdge is no longer framed as a single fixed-product stack.
 This spec now treats it as a composable platform with:
 
 - a multi-tenant control plane
+- hybrid B2B + B2C commercial primitives for individuals, organizations, and resellers
 - pluggable identity, billing, posture, notification, and provider integrations
 - a node agent that can host multiple runtime adapters
 - policy, audit, and rollout workflows designed for explainability and governance
@@ -44,7 +45,7 @@ This spec now treats it as a composable platform with:
 
 The platform has three logical layers:
 
-- Control plane: tenancy, policy, billing, rollout orchestration, audit, observability, integration management
+- Control plane: accounts, tenancy, policy, billing, rollout orchestration, audit, observability, integration management
 - Capability layer: identity connectors, posture providers, policy packs, notifications, exports, UI extensions, runtime adapters
 - Execution plane: node agents, managed runtimes, telemetry probes, local enforcement, diagnostics, lifecycle control
 
@@ -61,5 +62,6 @@ The platform has three logical layers:
 
 - No stealth or obfuscation protocols
 - No anti-abuse bypass or circumvention tactics
+- No censorship-evasion positioning, even when using self-service subscription delivery
 - No attempt to replace every SSE/SASE category in v1
 - No implementation work implied by this document refresh

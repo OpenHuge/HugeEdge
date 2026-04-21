@@ -1,3 +1,3 @@
 package billing
 
-// Package billing is contract-only in initialization.
+// Package billing owns catalog, subscription, payment, invoice, wallet, and settlement domains.

@@ -29,6 +29,7 @@
 
 - landing and docs
 - login
+- signup
 - password reset
 - invite accept
 - status page
@@ -36,19 +37,27 @@
 ### Tenant self-service
 
 - dashboard
+- store
 - subscription
+- orders
+- invoices
+- wallet
+- members
+- feeds
 - usage
 - users and devices
 - profiles
 - approvals
-- invoices
 - diagnostics export
 
 ### Operator admin
 
 - global dashboard
 - tenants
-- plans
+- accounts
+- catalog and pricing
+- subscriptions and orders
+- invoices and reseller settlement
 - regions and providers
 - nodes and runtimes
 - rollouts
@@ -63,18 +72,32 @@
 ```text
 /
   /login
+  /signup
   /app
     /dashboard
+    /store
+    /subscription
+    /orders
+    /invoices
+    /wallet
+    /members
+    /feeds
     /usage
     /profiles
     /devices
     /approvals
-    /billing
     /settings
   /admin
     /overview
     /tenants
-    /plans
+    /accounts
+    /billing
+      /overview
+      /products
+      /subscriptions
+      /orders
+      /resellers
+      /invoices
     /fleet
       /nodes
       /regions
@@ -115,11 +138,13 @@
 Cards:
 
 - active tenants
+- active accounts by type
 - active nodes
 - unhealthy nodes
 - rollout failures
 - high-risk access events
 - traffic today and by billing period
+- MRR and prepaid wallet balance summary
 - connector health summary
 
 Charts:
@@ -128,6 +153,7 @@ Charts:
 - node health trend
 - denied access reasons
 - subscription churn
+- orders by payment rail
 - incident volume
 
 ### Fleet and nodes
@@ -171,6 +197,26 @@ Must show:
 - matched rules
 - allow or deny
 - explanation and next-step hint
+
+### Billing and catalog center
+
+Must show:
+
+- products, SKUs, price versions, and entitlement templates
+- subscription lifecycle and renewal status
+- order and payment state with approval requirements for manual rails
+- invoice issuance, refund state, and downloadable artifacts
+- reseller balance, settlement, recharge-code inventory, and customer portfolio
+
+### Subscription feed center
+
+Must show:
+
+- active feeds and owning subscriptions
+- token last used, expiry metadata, and optional device binding
+- usage and expiration headers exactly as delivered to clients
+- rotate and revoke actions with audit trail visibility
+- client compatibility manifests and import hints
 
 ### Integration detail
 
@@ -217,6 +263,9 @@ Shared components:
 - `CapabilityPill`
 - `ConfirmActionModal`
 - `CommandProgressDrawer`
+- `BillingBreakdown`
+- `EntitlementMeter`
+- `FeedTokenCard`
 
 ## 6.8 Frontend Extensibility Model
 
@@ -259,6 +308,7 @@ Each UI extension must declare:
 ## 6.11 Authorization in UI
 
 - derive permissions from backend capability maps
+- derive account-role and billing-scope UI state from JWT claims and `/v1/app/billing/overview`
 - hide unavailable actions
 - never rely on UI gating alone
 - show impersonation or support banners clearly
