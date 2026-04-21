@@ -53,6 +53,130 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Actor"
+  /v1/app/billing/overview:
+    get:
+      operationId: getBillingOverview
+      responses:
+        "200":
+          description: Billing overview for the current account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingOverview"
+  /v1/app/catalog/products:
+    get:
+      operationId: listCatalogProducts
+      responses:
+        "200":
+          description: Catalog products visible to the current actor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CatalogProduct"
+  /v1/app/subscriptions:
+    get:
+      operationId: listAppSubscriptions
+      responses:
+        "200":
+          description: Subscriptions for the current account
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Subscription"
+  /v1/app/subscriptions/{subscriptionId}:
+    get:
+      operationId: getAppSubscription
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      responses:
+        "200":
+          description: Subscription detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+  /v1/app/orders:
+    get:
+      operationId: listAppOrders
+      responses:
+        "200":
+          description: Orders for the current account
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+  /v1/app/orders/{orderId}:
+    get:
+      operationId: getAppOrder
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+  /v1/app/subscription-feeds:
+    get:
+      operationId: listAppSubscriptionFeeds
+      responses:
+        "200":
+          description: Active subscription feeds for the current account
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubscriptionFeed"
+  /v1/admin/accounts:
+    get:
+      operationId: listAccounts
+      responses:
+        "200":
+          description: Accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Account"
+    post:
+      operationId: createAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountRequest"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+    patch:
+      operationId: updateAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAccountRequest"
+      responses:
+        "200":
+          description: Account updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
   /v1/admin/tenants:
     get:
       operationId: listTenants
@@ -251,14 +375,34 @@ components:
       required: true
       schema:
         type: string
+    SubscriptionId:
+      name: subscriptionId
+      in: path
+      required: true
+      schema:
+        type: string
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     Actor:
       type: object
-      required: [id, email, tenantId, roleIds, sessionId]
+      required: [id, email, accountId, accountRoleIds, billingScope, tenantId, roleIds, sessionId]
       properties:
         id:
           type: string
         email:
+          type: string
+        accountId:
+          type: string
+        accountRoleIds:
+          type: array
+          items:
+            type: string
+        billingScope:
           type: string
         tenantId:
           type: string
@@ -292,6 +436,29 @@ components:
       required: [refreshToken]
       properties:
         refreshToken:
+          type: string
+    CreateAccountRequest:
+      type: object
+      required: [type, name]
+      properties:
+        type:
+          type: string
+          enum: [individual, organization, reseller]
+        name:
+          type: string
+        billingEmail:
+          type: string
+    UpdateAccountRequest:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        billingEmail:
           type: string
     CreateTenantRequest:
       type: object
@@ -330,6 +497,216 @@ components:
         createdAt:
           type: string
           format: date-time
+    Account:
+      type: object
+      required: [id, type, name, slug, status, billingEmail, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [individual, organization, reseller]
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+        billingEmail:
+          type: string
+        defaultTenantId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    WalletSummary:
+      type: object
+      required: [currency, balanceMinor]
+      properties:
+        currency:
+          type: string
+        balanceMinor:
+          type: integer
+    CatalogPriceVersion:
+      type: object
+      required: [id, currency, unitAmountMinor, entitlementTemplate]
+      properties:
+        id:
+          type: string
+        currency:
+          type: string
+        unitAmountMinor:
+          type: integer
+        entitlementTemplate:
+          type: object
+          additionalProperties: true
+    CatalogSku:
+      type: object
+      required: [id, code, name, kind, isActive]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        billingInterval:
+          type: string
+        isActive:
+          type: boolean
+        currentPrice:
+          $ref: "#/components/schemas/CatalogPriceVersion"
+    CatalogProduct:
+      type: object
+      required: [id, code, name, description, isFeatured, skus]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        isFeatured:
+          type: boolean
+        skus:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogSku"
+    Subscription:
+      type: object
+      required:
+        - id
+        - accountId
+        - productCode
+        - productName
+        - skuId
+        - skuCode
+        - status
+        - currentPeriodStart
+        - currentPeriodEnd
+        - autoRenew
+        - feedCount
+      properties:
+        id:
+          type: string
+        accountId:
+          type: string
+        tenantId:
+          type: string
+        productCode:
+          type: string
+        productName:
+          type: string
+        skuId:
+          type: string
+        skuCode:
+          type: string
+        status:
+          type: string
+        currentPeriodStart:
+          type: string
+          format: date-time
+        currentPeriodEnd:
+          type: string
+          format: date-time
+        autoRenew:
+          type: boolean
+        feedCount:
+          type: integer
+        entitlementTemplate:
+          type: object
+          additionalProperties: true
+    Order:
+      type: object
+      required: [id, accountId, status, currency, subtotalMinor, payableMinor, createdAt]
+      properties:
+        id:
+          type: string
+        accountId:
+          type: string
+        subscriptionId:
+          type: string
+        status:
+          type: string
+        currency:
+          type: string
+        subtotalMinor:
+          type: integer
+        payableMinor:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    SubscriptionFeed:
+      type: object
+      required:
+        - id
+        - subscriptionId
+        - accountId
+        - label
+        - status
+        - planName
+        - primary
+        - token
+        - etag
+        - notice
+        - createdAt
+      properties:
+        id:
+          type: string
+        subscriptionId:
+          type: string
+        accountId:
+          type: string
+        tenantId:
+          type: string
+        label:
+          type: string
+        status:
+          type: string
+        planName:
+          type: string
+        primary:
+          type: boolean
+        token:
+          type: string
+        accessUrl:
+          type: string
+        etag:
+          type: string
+        notice:
+          type: string
+        lastUsedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    BillingOverview:
+      type: object
+      required: [account, wallet, recentOrders, activeFeedCount, availableProductCount]
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        wallet:
+          $ref: "#/components/schemas/WalletSummary"
+        activeSubscription:
+          $ref: "#/components/schemas/Subscription"
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        activeFeedCount:
+          type: integer
+        availableProductCount:
+          type: integer
     Node:
       type: object
       required:

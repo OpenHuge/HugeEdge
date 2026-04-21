@@ -34,11 +34,14 @@ type Store struct {
 }
 
 type Principal struct {
-	UserID    string
-	Email     string
-	TenantID  string
-	RoleIDs   []string
-	SessionID string
+	UserID         string
+	Email          string
+	AccountID      string
+	AccountRoleIDs []string
+	BillingScope   string
+	TenantID       string
+	RoleIDs        []string
+	SessionID      string
 }
 
 type User struct {
@@ -225,10 +228,29 @@ func (s *Store) bootstrapFirstAdmin(ctx context.Context, tx pgx.Tx, email string
 	roleID := uuid.NewString()
 	userID := uuid.NewString()
 	membershipID := uuid.NewString()
+	accountID := uuid.NewString()
+	accountMembershipID := uuid.NewString()
+	accountName := strings.TrimSpace(strings.Split(email, "@")[0])
+	if accountName == "" {
+		accountName = "Default Account"
+	}
+	accountSlug := uniqueSlugFromParts(accountName, userID[:8])
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO tenants (id, name, slug, status) VALUES ($1, 'Default Tenant', 'default', 'active')`,
-		tenantID,
+		`INSERT INTO accounts (id, type, name, slug, status, billing_email) VALUES ($1, 'individual', $2, $3, 'active', $4)`,
+		accountID, accountName, accountSlug, email,
+	); err != nil {
+		return Principal{}, err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO tenants (id, account_id, name, slug, status) VALUES ($1, $2, 'Default Tenant', 'default', 'active')`,
+		tenantID, accountID,
+	); err != nil {
+		return Principal{}, err
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE accounts SET default_tenant_id = $2, updated_at = now() WHERE id = $1`,
+		accountID, tenantID,
 	); err != nil {
 		return Principal{}, err
 	}
@@ -248,6 +270,21 @@ func (s *Store) bootstrapFirstAdmin(ctx context.Context, tx pgx.Tx, email string
 		`INSERT INTO memberships (id, tenant_id, user_id, role_id) VALUES ($1, $2, $3, $4)`,
 		membershipID, tenantID, userID, roleID,
 	); err != nil {
+		return Principal{}, err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO account_memberships (id, account_id, user_id, role_name) VALUES ($1, $2, $3, 'account_owner')`,
+		accountMembershipID, accountID, userID,
+	); err != nil {
+		return Principal{}, err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO wallets (id, account_id, currency, balance_minor) VALUES ($1, $2, 'USD', 0)`,
+		uuid.NewString(), accountID,
+	); err != nil {
+		return Principal{}, err
+	}
+	if err := s.bootstrapCommerceForAccount(ctx, tx, accountID, tenantID); err != nil {
 		return Principal{}, err
 	}
 
@@ -301,12 +338,20 @@ func (s *Store) createSessionPrincipal(ctx context.Context, tx pgx.Tx, userID st
 		return Principal{}, err
 	}
 
+	accountID, accountRoleIDs, billingScope, err := s.accountContextForUser(ctx, tx, userID, tenantID)
+	if err != nil {
+		return Principal{}, err
+	}
+
 	return Principal{
-		UserID:    userID,
-		Email:     email,
-		TenantID:  tenantID,
-		RoleIDs:   roleIDs,
-		SessionID: sessionID,
+		UserID:         userID,
+		Email:          email,
+		AccountID:      accountID,
+		AccountRoleIDs: accountRoleIDs,
+		BillingScope:   billingScope,
+		TenantID:       tenantID,
+		RoleIDs:        roleIDs,
+		SessionID:      sessionID,
 	}, nil
 }
 
@@ -395,7 +440,20 @@ func (s *Store) principalForSession(ctx context.Context, tx pgx.Tx, userID strin
 	if tenantID == "" {
 		return Principal{}, ErrInvalidRefreshToken
 	}
-	return Principal{UserID: userID, Email: email, TenantID: tenantID, RoleIDs: roleIDs, SessionID: sessionID}, nil
+	accountID, accountRoleIDs, billingScope, err := s.accountContextForUser(ctx, tx, userID, tenantID)
+	if err != nil {
+		return Principal{}, err
+	}
+	return Principal{
+		UserID:         userID,
+		Email:          email,
+		AccountID:      accountID,
+		AccountRoleIDs: accountRoleIDs,
+		BillingScope:   billingScope,
+		TenantID:       tenantID,
+		RoleIDs:        roleIDs,
+		SessionID:      sessionID,
+	}, nil
 }
 
 func (s *Store) RevokeSession(ctx context.Context, sessionID string) error {

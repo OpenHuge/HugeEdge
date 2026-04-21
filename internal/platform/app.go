@@ -69,10 +69,22 @@ func (a *App) Router() http.Handler {
 		r.Post("/auth/login", a.login)
 		r.Post("/auth/refresh", a.refresh)
 		r.Post("/auth/logout", a.logout)
+		r.Get("/sub/{token}", a.getSubscriptionFeed)
+		r.Head("/sub/{token}", a.getSubscriptionFeed)
 
 		r.Group(func(r chi.Router) {
 			r.Use(a.authMiddleware)
 			r.Get("/app/me", a.me)
+			r.Get("/app/billing/overview", a.billingOverview)
+			r.Get("/app/catalog/products", a.listCatalogProducts)
+			r.Get("/app/subscriptions", a.listAppSubscriptions)
+			r.Get("/app/subscriptions/{subscriptionId}", a.getAppSubscription)
+			r.Get("/app/orders", a.listAppOrders)
+			r.Get("/app/orders/{orderId}", a.getAppOrder)
+			r.Get("/app/subscription-feeds", a.listAppSubscriptionFeeds)
+			r.Get("/admin/accounts", a.listAccounts)
+			r.Post("/admin/accounts", a.createAccount)
+			r.Patch("/admin/accounts", a.patchAccount)
 			r.Get("/admin/tenants", a.listTenants)
 			r.Post("/admin/tenants", a.createTenant)
 			r.Get("/admin/tenants/{tenantId}", a.getTenant)
@@ -132,7 +144,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	tokens, err := a.issueTokens(principal.UserID, principal.TenantID, principal.SessionID, principal.RoleIDs)
+	tokens, err := a.issueTokens(principal)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -165,7 +177,7 @@ func (a *App) refresh(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	tokens, err := a.issueTokens(principal.UserID, principal.TenantID, principal.SessionID, principal.RoleIDs)
+	tokens, err := a.issueTokens(principal)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -199,11 +211,14 @@ func (a *App) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id":        claims.Subject,
-		"email":     user.Email,
-		"tenantId":  claims.TenantID,
-		"roleIds":   claims.RoleIDs,
-		"sessionId": claims.SessionID,
+		"id":             claims.Subject,
+		"email":          user.Email,
+		"accountId":      claims.AccountID,
+		"accountRoleIds": claims.AccountRoleIDs,
+		"billingScope":   claims.BillingScope,
+		"tenantId":       claims.TenantID,
+		"roleIds":        claims.RoleIDs,
+		"sessionId":      claims.SessionID,
 	})
 }
 
@@ -608,15 +623,18 @@ func (a *App) accepted(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (a *App) issueTokens(userID string, tenantID string, sessionID string, roles []string) (AuthTokens, error) {
+func (a *App) issueTokens(principal Principal) (AuthTokens, error) {
 	now := time.Now()
 	claims := HugeEdgeClaims{
-		TenantID:  tenantID,
-		RoleIDs:   roles,
-		SessionID: sessionID,
-		TokenType: "access",
+		AccountID:      principal.AccountID,
+		AccountRoleIDs: principal.AccountRoleIDs,
+		BillingScope:   principal.BillingScope,
+		TenantID:       principal.TenantID,
+		RoleIDs:        principal.RoleIDs,
+		SessionID:      principal.SessionID,
+		TokenType:      "access",
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID,
+			Subject:   principal.UserID,
 			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(now),
 		},

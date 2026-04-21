@@ -107,6 +107,20 @@ describe("HugeEdgeClient", () => {
     await client.rollbackRollout("rollout-1");
     await client.providers();
     await client.regions();
+    await client.accounts();
+    await client.createAccount({
+      type: "organization",
+      name: "Northwind",
+      billingEmail: "billing@northwind.example",
+    });
+    await client.updateAccount({ id: "acc-1", status: "suspended" });
+    await client.billingOverview();
+    await client.catalogProducts();
+    await client.appSubscriptions();
+    await client.appSubscription("sub-1");
+    await client.appOrders();
+    await client.appOrder("ord-1");
+    await client.appSubscriptionFeeds();
 
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       "http://api.test/v1/admin/tenants/tenant-1",
@@ -117,6 +131,16 @@ describe("HugeEdgeClient", () => {
       "http://api.test/v1/admin/rollouts/rollout-1/rollback",
       "http://api.test/v1/admin/providers",
       "http://api.test/v1/admin/regions",
+      "http://api.test/v1/admin/accounts",
+      "http://api.test/v1/admin/accounts",
+      "http://api.test/v1/admin/accounts",
+      "http://api.test/v1/app/billing/overview",
+      "http://api.test/v1/app/catalog/products",
+      "http://api.test/v1/app/subscriptions",
+      "http://api.test/v1/app/subscriptions/sub-1",
+      "http://api.test/v1/app/orders",
+      "http://api.test/v1/app/orders/ord-1",
+      "http://api.test/v1/app/subscription-feeds",
     ]);
   });
 });

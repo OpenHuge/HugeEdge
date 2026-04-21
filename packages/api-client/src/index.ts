@@ -9,9 +9,108 @@ export type AuthTokens = {
 export type Actor = {
   id: string;
   email: string;
+  accountId: string;
+  accountRoleIds: string[];
+  billingScope: string;
   tenantId: string;
   roleIds: string[];
   sessionId: string;
+};
+
+export type Account = {
+  id: string;
+  type: "individual" | "organization" | "reseller";
+  name: string;
+  slug: string;
+  status: string;
+  billingEmail: string;
+  defaultTenantId?: string;
+  createdAt: string;
+};
+
+export type WalletSummary = {
+  currency: string;
+  balanceMinor: number;
+};
+
+export type CatalogPriceVersion = {
+  id: string;
+  currency: string;
+  unitAmountMinor: number;
+  entitlementTemplate: Record<string, unknown>;
+};
+
+export type CatalogSku = {
+  id: string;
+  code: string;
+  name: string;
+  kind: string;
+  billingInterval?: string;
+  isActive: boolean;
+  currentPrice?: CatalogPriceVersion;
+};
+
+export type CatalogProduct = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  isFeatured: boolean;
+  skus: CatalogSku[];
+};
+
+export type Subscription = {
+  id: string;
+  accountId: string;
+  tenantId?: string;
+  productCode: string;
+  productName: string;
+  skuId: string;
+  skuCode: string;
+  status: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  autoRenew: boolean;
+  feedCount: number;
+  entitlementTemplate?: Record<string, unknown>;
+};
+
+export type Order = {
+  id: string;
+  accountId: string;
+  subscriptionId?: string;
+  status: string;
+  currency: string;
+  subtotalMinor: number;
+  payableMinor: number;
+  createdAt: string;
+};
+
+export type SubscriptionFeed = {
+  id: string;
+  subscriptionId: string;
+  accountId: string;
+  tenantId?: string;
+  label: string;
+  status: string;
+  planName: string;
+  primary: boolean;
+  token: string;
+  accessUrl?: string;
+  etag: string;
+  notice: string;
+  lastUsedAt?: string;
+  expiresAt?: string;
+  createdAt: string;
+};
+
+export type BillingOverview = {
+  account: Account;
+  wallet: WalletSummary;
+  activeSubscription?: Subscription;
+  recentOrders: Order[];
+  activeFeedCount: number;
+  availableProductCount: number;
 };
 
 export type Tenant = {
@@ -197,6 +296,61 @@ export class HugeEdgeClient {
 
   me() {
     return this.request<Actor>("/v1/app/me");
+  }
+
+  billingOverview() {
+    return this.request<BillingOverview>("/v1/app/billing/overview");
+  }
+
+  catalogProducts() {
+    return this.request<CatalogProduct[]>("/v1/app/catalog/products");
+  }
+
+  appSubscriptions() {
+    return this.request<Subscription[]>("/v1/app/subscriptions");
+  }
+
+  appSubscription(id: string) {
+    return this.request<Subscription>(`/v1/app/subscriptions/${id}`);
+  }
+
+  appOrders() {
+    return this.request<Order[]>("/v1/app/orders");
+  }
+
+  appOrder(id: string) {
+    return this.request<Order>(`/v1/app/orders/${id}`);
+  }
+
+  appSubscriptionFeeds() {
+    return this.request<SubscriptionFeed[]>("/v1/app/subscription-feeds");
+  }
+
+  accounts() {
+    return this.request<Account[]>("/v1/admin/accounts");
+  }
+
+  createAccount(input: {
+    type: "individual" | "organization" | "reseller";
+    name: string;
+    billingEmail?: string;
+  }) {
+    return this.request<Account>("/v1/admin/accounts", {
+      method: "POST",
+      body: input,
+    });
+  }
+
+  updateAccount(input: {
+    id: string;
+    name?: string;
+    status?: string;
+    billingEmail?: string;
+  }) {
+    return this.request<Account>("/v1/admin/accounts", {
+      method: "PATCH",
+      body: input,
+    });
   }
 
   tenants() {
