@@ -8,3 +8,7 @@ fi
 if command -v codex >/dev/null 2>&1; then
   codex --version >/dev/null 2>&1 || true
 fi
+
+if command -v cn >/dev/null 2>&1; then
+  cn --version >/dev/null 2>&1 || true
+fi

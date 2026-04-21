@@ -267,6 +267,9 @@ components:
         adapterName:
           type: string
           const: xray-adapter
+        lastHeartbeatAt:
+          type: string
+          format: date-time
         createdAt:
           type: string
           format: date-time
@@ -301,6 +304,9 @@ components:
           type: string
         tenantId:
           type: string
+        metadata:
+          type: object
+          additionalProperties: true
         createdAt:
           type: string
           format: date-time

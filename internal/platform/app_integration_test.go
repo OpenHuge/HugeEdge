@@ -51,6 +51,10 @@ func TestAppDatabaseBackedControlPlaneFlow(t *testing.T) {
 
 	var tenant Tenant
 	doJSON(t, server.URL, http.MethodPost, "/v1/admin/tenants", tokens.AccessToken, map[string]string{
+		"name": "",
+		"slug": "Bad Slug",
+	}, http.StatusBadRequest, nil)
+	doJSON(t, server.URL, http.MethodPost, "/v1/admin/tenants", tokens.AccessToken, map[string]string{
 		"name": "Acme",
 		"slug": "acme",
 	}, http.StatusCreated, &tenant)
@@ -87,6 +91,20 @@ func TestAppDatabaseBackedControlPlaneFlow(t *testing.T) {
 	if len(nodes) != 1 || nodes[0].Status != "ready" {
 		t.Fatalf("expected one ready node, got %#v", nodes)
 	}
+	if nodes[0].LastHeartbeatAt == nil {
+		t.Fatalf("expected node heartbeat timestamp, got %#v", nodes[0])
+	}
+
+	var providers []Provider
+	doJSON(t, server.URL, http.MethodGet, "/v1/admin/providers", tokens.AccessToken, nil, http.StatusOK, &providers)
+	if len(providers) == 0 {
+		t.Fatal("expected seeded providers")
+	}
+	var regions []Region
+	doJSON(t, server.URL, http.MethodGet, "/v1/admin/regions", tokens.AccessToken, nil, http.StatusOK, &regions)
+	if len(regions) == 0 {
+		t.Fatal("expected seeded regions")
+	}
 
 	var rotated AuthTokens
 	doJSON(t, server.URL, http.MethodPost, "/v1/auth/refresh", "", map[string]string{
@@ -98,14 +116,20 @@ func TestAppDatabaseBackedControlPlaneFlow(t *testing.T) {
 
 	var audit []AuditLog
 	doJSON(t, server.URL, http.MethodGet, "/v1/admin/audit-logs", rotated.AccessToken, nil, http.StatusOK, &audit)
-	seen := map[string]bool{}
+	seen := map[string]AuditLog{}
 	for _, entry := range audit {
-		seen[entry.Action] = true
+		seen[entry.Action] = entry
 	}
 	for _, action := range []string{"auth.login", "tenant.create", "node.bootstrap_token.create"} {
-		if !seen[action] {
+		if _, ok := seen[action]; !ok {
 			t.Fatalf("missing audit action %q in %#v", action, audit)
 		}
+	}
+	if seen["tenant.create"].Metadata["slug"] != "acme" {
+		t.Fatalf("missing tenant create audit metadata: %#v", seen["tenant.create"])
+	}
+	if _, ok := seen["node.bootstrap_token.create"].Metadata["expiresAt"]; !ok {
+		t.Fatalf("missing bootstrap token audit metadata: %#v", seen["node.bootstrap_token.create"])
 	}
 }
 

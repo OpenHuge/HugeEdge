@@ -56,12 +56,13 @@ type Tenant struct {
 }
 
 type Node struct {
-	ID          string    `json:"id"`
-	TenantID    string    `json:"tenantId"`
-	Name        string    `json:"name"`
-	Status      string    `json:"status"`
-	AdapterName string    `json:"adapterName"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID              string     `json:"id"`
+	TenantID        string     `json:"tenantId"`
+	Name            string     `json:"name"`
+	Status          string     `json:"status"`
+	AdapterName     string     `json:"adapterName"`
+	LastHeartbeatAt *time.Time `json:"lastHeartbeatAt,omitempty"`
+	CreatedAt       time.Time  `json:"createdAt"`
 }
 
 type BootstrapToken struct {
@@ -76,11 +77,12 @@ type Capability struct {
 }
 
 type AuditLog struct {
-	ID        string    `json:"id"`
-	Action    string    `json:"action"`
-	ActorID   string    `json:"actorId"`
-	TenantID  string    `json:"tenantId,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        string         `json:"id"`
+	Action    string         `json:"action"`
+	ActorID   string         `json:"actorId"`
+	TenantID  string         `json:"tenantId,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+	CreatedAt time.Time      `json:"createdAt"`
 }
 
 type Provider struct {
@@ -467,12 +469,13 @@ func (s *Store) ListNodes(ctx context.Context) ([]Node, error) {
 	nodes := make([]Node, 0, len(rows))
 	for _, row := range rows {
 		nodes = append(nodes, Node{
-			ID:          uuidString(row.ID),
-			TenantID:    uuidString(row.TenantID),
-			Name:        row.Name,
-			Status:      row.Status,
-			AdapterName: row.AdapterName,
-			CreatedAt:   timeFromTimestamptz(row.CreatedAt),
+			ID:              uuidString(row.ID),
+			TenantID:        uuidString(row.TenantID),
+			Name:            row.Name,
+			Status:          row.Status,
+			AdapterName:     row.AdapterName,
+			LastHeartbeatAt: timePtrFromTimestamptz(row.LastHeartbeatAt),
+			CreatedAt:       timeFromTimestamptz(row.CreatedAt),
 		})
 	}
 	return nodes, nil
@@ -480,13 +483,15 @@ func (s *Store) ListNodes(ctx context.Context) ([]Node, error) {
 
 func (s *Store) Node(ctx context.Context, id string) (Node, error) {
 	var node Node
+	var lastHeartbeatAt pgtype.Timestamptz
 	err := s.db.QueryRow(ctx,
-		`SELECT id::text, tenant_id::text, name, status, adapter_name, created_at FROM nodes WHERE id = $1`,
+		`SELECT id::text, tenant_id::text, name, status, adapter_name, last_heartbeat_at, created_at FROM nodes WHERE id = $1`,
 		id,
-	).Scan(&node.ID, &node.TenantID, &node.Name, &node.Status, &node.AdapterName, &node.CreatedAt)
+	).Scan(&node.ID, &node.TenantID, &node.Name, &node.Status, &node.AdapterName, &lastHeartbeatAt, &node.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Node{}, ErrNotFound
 	}
+	node.LastHeartbeatAt = timePtrFromTimestamptz(lastHeartbeatAt)
 	return node, err
 }
 
@@ -515,10 +520,17 @@ func (s *Store) ListAudit(ctx context.Context) ([]AuditLog, error) {
 
 	logs := make([]AuditLog, 0, len(rows))
 	for _, row := range rows {
+		metadata := map[string]any{}
+		if len(row.Metadata) > 0 {
+			if err := json.Unmarshal(row.Metadata, &metadata); err != nil {
+				return nil, err
+			}
+		}
 		logs = append(logs, AuditLog{
 			ID:        uuidString(row.ID),
 			ActorID:   uuidString(row.ActorID),
 			TenantID:  uuidString(row.TenantID),
+			Metadata:  metadata,
 			Action:    row.Action,
 			CreatedAt: timeFromTimestamptz(row.CreatedAt),
 		})
@@ -526,10 +538,17 @@ func (s *Store) ListAudit(ctx context.Context) ([]AuditLog, error) {
 	return logs, nil
 }
 
-func (s *Store) Audit(ctx context.Context, action string, actorID string, tenantID string) error {
-	_, err := s.db.Exec(ctx,
-		`INSERT INTO audit_logs (id, actor_id, tenant_id, action, metadata) VALUES ($1, nullif($2, '')::uuid, nullif($3, '')::uuid, $4, '{}'::jsonb)`,
-		uuid.NewString(), actorID, tenantID, action,
+func (s *Store) Audit(ctx context.Context, action string, actorID string, tenantID string, metadata map[string]any) error {
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(ctx,
+		`INSERT INTO audit_logs (id, actor_id, tenant_id, action, metadata) VALUES ($1, nullif($2, '')::uuid, nullif($3, '')::uuid, $4, $5)`,
+		uuid.NewString(), actorID, tenantID, action, metadataJSON,
 	)
 	return err
 }
@@ -725,4 +744,11 @@ func timeFromTimestamptz(value pgtype.Timestamptz) time.Time {
 		return time.Time{}
 	}
 	return value.Time
+}
+
+func timePtrFromTimestamptz(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	return &value.Time
 }

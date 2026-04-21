@@ -7,6 +7,7 @@ The current codebase initializes:
 - a modular Go control-plane API
 - thin `worker`, `ext-runtime`, and `agent` binaries
 - a TanStack/Mantine operator shell
+- repo-native Continue checks in `.continue/checks/`
 - checked-in OpenAPI, database migrations, and contract schemas
 - local Docker orchestration for Postgres, Redis, NATS JetStream, MinIO, API, worker, extension runtime, and web
 
@@ -29,6 +30,24 @@ pnpm validate:policy-packs
 pnpm validate:wasm-artifacts
 pnpm validate:probe-profiles
 ```
+
+## Continue Checks
+
+HugeEdge now carries source-controlled Continue checks under [`.continue/checks/`](./.continue/checks/), following Continue's repository-native PR check model. The initial checks cover:
+
+- control-plane API, auth, audit, and generated client alignment
+- migration and sqlc/store safety
+- operator shell auth and typed data-flow integrity
+
+For local use in the devcontainer or Codespaces, the workspace installs both `codex` and the Continue CLI `cn`, and VS Code includes the `Continue.continue` extension.
+
+Recommended local flow:
+
+```sh
+cn
+```
+
+Then run Continue's local check workflow from your agent session after editing check files or preparing a PR. To activate GitHub PR checks, connect the repository in Continue so every file in `.continue/checks/` runs as a status check on pull requests.
 
 The Go toolchain target is `go1.26.2`. If Go is not installed locally, the Docker stack uses the pinned `golang:1.26.2` image.
 

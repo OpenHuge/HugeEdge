@@ -28,6 +28,7 @@ export type Node = {
   name: string;
   status: string;
   adapterName: "xray-adapter";
+  lastHeartbeatAt?: string;
   createdAt: string;
 };
 
@@ -36,6 +37,7 @@ export type AuditLog = {
   action: string;
   actorId: string;
   tenantId?: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 };
 
@@ -49,6 +51,29 @@ export type BootstrapToken = {
   token: string;
   expiresAt: string;
 };
+
+export type Provider = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export type Region = {
+  id: string;
+  providerId: string;
+  name: string;
+  code: string;
+};
+
+export class HugeEdgeApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "HugeEdgeApiError";
+  }
+}
 
 const tokenSchema = z.object({
   accessToken: z.string(),
@@ -114,17 +139,23 @@ export class HugeEdgeClient {
   async refresh() {
     const refreshToken = this.tokenStore?.getRefreshToken();
     if (!refreshToken) {
+      this.tokenStore?.clear();
       throw new Error("missing refresh token");
     }
-    const tokens = tokenSchema.parse(
-      await this.request("/v1/auth/refresh", {
-        method: "POST",
-        body: { refreshToken },
-        auth: false,
-      }),
-    );
-    this.tokenStore?.setTokens(tokens);
-    return tokens;
+    try {
+      const tokens = tokenSchema.parse(
+        await this.request("/v1/auth/refresh", {
+          method: "POST",
+          body: { refreshToken },
+          auth: false,
+        }),
+      );
+      this.tokenStore?.setTokens(tokens);
+      return tokens;
+    } catch (error) {
+      this.tokenStore?.clear();
+      throw error;
+    }
   }
 
   async logout() {
@@ -140,6 +171,10 @@ export class HugeEdgeClient {
     return this.request<Tenant[]>("/v1/admin/tenants");
   }
 
+  tenant(id: string) {
+    return this.request<Tenant>(`/v1/admin/tenants/${id}`);
+  }
+
   createTenant(input: { name: string; slug: string }) {
     return this.request<Tenant>("/v1/admin/tenants", {
       method: "POST",
@@ -151,12 +186,24 @@ export class HugeEdgeClient {
     return this.request<Node[]>("/v1/admin/nodes");
   }
 
+  node(id: string) {
+    return this.request<Node>(`/v1/admin/nodes/${id}`);
+  }
+
   auditLogs() {
     return this.request<AuditLog[]>("/v1/admin/audit-logs");
   }
 
   capabilities() {
     return this.request<Capability[]>("/v1/admin/capabilities");
+  }
+
+  providers() {
+    return this.request<Provider[]>("/v1/admin/providers");
+  }
+
+  regions() {
+    return this.request<Region[]>("/v1/admin/regions");
   }
 
   createBootstrapToken() {
@@ -195,15 +242,32 @@ export class HugeEdgeClient {
       options.retry !== false &&
       options.auth !== false
     ) {
-      await this.refresh();
-      return this.request<T>(path, { ...options, retry: false });
+      try {
+        await this.refresh();
+        return this.request<T>(path, { ...options, retry: false });
+      } catch (error) {
+        this.tokenStore?.clear();
+        throw error;
+      }
     }
     if (!response.ok) {
-      throw new Error(`HugeEdge API request failed: ${response.status}`);
+      throw new HugeEdgeApiError(response.status, await errorMessage(response));
     }
     if (response.status === 204) {
       return undefined as T;
     }
     return (await response.json()) as T;
   }
+}
+
+async function errorMessage(response: Response) {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    if (typeof body.error === "string" && body.error !== "") {
+      return body.error;
+    }
+  } catch {
+    // Fall back to the status text below.
+  }
+  return `HugeEdge API request failed: ${response.status}`;
 }

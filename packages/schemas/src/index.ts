@@ -23,5 +23,6 @@ export const nodeSchema = z.object({
   name: z.string(),
   status: z.string(),
   adapterName: z.literal("xray-adapter"),
+  lastHeartbeatAt: z.string().optional(),
   createdAt: z.string(),
 });

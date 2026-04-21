@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -22,6 +23,8 @@ type App struct {
 	deps  Dependencies
 	store *Store
 }
+
+var tenantSlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 func NewApp(cfg Config) *App {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -128,7 +131,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	if err := a.store.Audit(r.Context(), "auth.login", principal.UserID, principal.TenantID); err != nil {
+	if err := a.store.Audit(r.Context(), "auth.login", principal.UserID, principal.TenantID, nil); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -212,6 +215,16 @@ func (a *App) createTenant(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	req.Name = strings.TrimSpace(req.Name)
+	req.Slug = strings.TrimSpace(req.Slug)
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, errors.New("tenant name is required"))
+		return
+	}
+	if !tenantSlugPattern.MatchString(req.Slug) {
+		writeError(w, http.StatusBadRequest, errors.New("tenant slug must use lowercase letters, numbers, and hyphens"))
+		return
+	}
 	claims := claimsFromContext(r.Context())
 	tenant, err := a.store.CreateTenant(r.Context(), req.Name, req.Slug)
 	if errors.Is(err, ErrConflict) {
@@ -222,7 +235,10 @@ func (a *App) createTenant(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	if err := a.store.Audit(r.Context(), "tenant.create", claims.Subject, tenant.ID); err != nil {
+	if err := a.store.Audit(r.Context(), "tenant.create", claims.Subject, tenant.ID, map[string]any{
+		"tenantId": tenant.ID,
+		"slug":     tenant.Slug,
+	}); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -289,7 +305,9 @@ func (a *App) createBootstrapToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	if err := a.store.Audit(r.Context(), "node.bootstrap_token.create", claims.Subject, claims.TenantID); err != nil {
+	if err := a.store.Audit(r.Context(), "node.bootstrap_token.create", claims.Subject, claims.TenantID, map[string]any{
+		"expiresAt": token.ExpiresAt,
+	}); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
