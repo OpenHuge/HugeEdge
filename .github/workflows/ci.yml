@@ -46,15 +46,18 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26.2"
           cache: true
-      - uses: golang-migrate/migrate-action@v1
-        with:
-          path: db/migrations
-          database: postgres://hugeedge:hugeedge@localhost:5432/hugeedge?sslmode=disable
-          command: up
+      - run: >
+          docker run --rm --network host
+          -v "$PWD:/src"
+          -w /src
+          migrate/migrate:v4.19.1
+          -path db/migrations
+          -database postgres://hugeedge:hugeedge@localhost:5432/hugeedge?sslmode=disable
+          up
       - run: docker run --rm -v "$PWD:/src" -w /src sqlc/sqlc:1.31.0 generate
       - run: go test ./...
         env:

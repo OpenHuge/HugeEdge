@@ -1,13 +1,26 @@
 import {
   Badge,
+  Box,
+  Button,
   Card,
   Group,
   Loader,
+  Paper,
+  ScrollArea,
   Stack,
   Table,
   Text,
   Title,
+  UnstyledButton,
 } from "@mantine/core";
+import {
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  type SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -52,63 +65,220 @@ export function MetricCard({
 
 export function LoadingState() {
   return (
-    <Group p="lg">
+    <Group p="lg" gap="sm">
       <Loader size="sm" />
-      <Text>Loading</Text>
+      <Text fw={500}>Loading</Text>
     </Group>
   );
 }
 
-export function EmptyState({ title }: { title: string }) {
+export function EmptyState({
+  title,
+  description = "No records found.",
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
   return (
     <Stack p="lg" gap={4}>
       <Title order={4}>{title}</Title>
-      <Text c="dimmed">No records found.</Text>
+      <Text c="dimmed">{description}</Text>
+      {action}
     </Stack>
   );
 }
 
-export function ErrorState({ message }: { message: string }) {
+export function ErrorState({
+  title = "Unable to load",
+  message,
+  onRetry,
+}: {
+  title?: string;
+  message: string;
+  onRetry?: () => void;
+}) {
   return (
     <Stack p="lg" gap={4}>
-      <Title order={4}>Unable to load</Title>
+      <Title order={4}>{title}</Title>
       <Text c="red">{message}</Text>
+      {onRetry ? (
+        <Group>
+          <Button variant="light" onClick={onRetry}>
+            Retry
+          </Button>
+        </Group>
+      ) : null}
     </Stack>
   );
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export type DataTableSort = {
+  id: string;
+  desc: boolean;
+};
+
+export type DataTableColumn<TData extends Record<string, unknown>> = {
+  id: string;
+  header: string;
+  accessorKey?: keyof TData;
+  accessorFn?: (row: TData) => unknown;
+  cell?: (row: TData) => ReactNode;
+  sortable?: boolean;
+  width?: string | number;
+};
+
+export function DataTable<TData extends Record<string, unknown>>({
   rows,
   columns,
+  toolbar,
+  loading = false,
+  error,
+  onRetry,
+  emptyTitle = "No results",
+  emptyDescription = "No records matched the current view.",
+  sort,
+  onSortChange,
 }: {
-  rows: T[];
-  columns: { key: keyof T; label: string; render?: (row: T) => ReactNode }[];
+  rows: TData[];
+  columns: Array<DataTableColumn<TData>>;
+  toolbar?: ReactNode;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  sort?: DataTableSort | null;
+  onSortChange?: (sort: DataTableSort | null) => void;
 }) {
-  if (rows.length === 0) {
-    return <EmptyState title="Empty" />;
-  }
+  const sortingState: SortingState = sort
+    ? [{ id: sort.id, desc: sort.desc }]
+    : [];
+  const tableColumns = columns.map<ColumnDef<TData>>((column) => ({
+    id: column.id,
+    header: column.header,
+    accessorFn: column.accessorFn
+      ? column.accessorFn
+      : (row) => (column.accessorKey ? row[column.accessorKey] : undefined),
+    enableSorting: column.sortable ?? false,
+    cell: (context) =>
+      column.cell
+        ? column.cell(context.row.original)
+        : String(context.getValue() ?? ""),
+    size: typeof column.width === "number" ? column.width : undefined,
+    meta: {
+      width: column.width,
+    },
+  }));
+
+  const table = useReactTable({
+    data: rows,
+    columns: tableColumns,
+    getCoreRowModel: getCoreRowModel(),
+    manualSorting: true,
+    state: {
+      sorting: sortingState,
+    },
+  });
+
+  const renderHeader = (column: DataTableColumn<TData>) => {
+    if (!column.sortable) {
+      return <Text fw={600}>{column.header}</Text>;
+    }
+
+    const isActive = sort?.id === column.id;
+    const icon = !isActive ? (
+      <ChevronsUpDown size={14} />
+    ) : sort?.desc ? (
+      <ChevronDown size={14} />
+    ) : (
+      <ChevronUp size={14} />
+    );
+
+    return (
+      <UnstyledButton
+        onClick={() => {
+          if (!onSortChange) {
+            return;
+          }
+          if (sort?.id !== column.id) {
+            onSortChange({ id: column.id, desc: false });
+            return;
+          }
+          if (sort.desc) {
+            onSortChange(null);
+            return;
+          }
+          onSortChange({ id: column.id, desc: true });
+        }}
+      >
+        <Group gap={6} wrap="nowrap">
+          <Text fw={600}>{column.header}</Text>
+          {icon}
+        </Group>
+      </UnstyledButton>
+    );
+  };
+
   return (
-    <Table striped highlightOnHover withTableBorder>
-      <Table.Thead>
-        <Table.Tr>
-          {columns.map((column) => (
-            <Table.Th key={String(column.key)}>{column.label}</Table.Th>
-          ))}
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {rows.map((row, index) => (
-          <Table.Tr key={String(row.id ?? index)}>
-            {columns.map((column) => (
-              <Table.Td key={String(column.key)}>
-                {column.render
-                  ? column.render(row)
-                  : String(row[column.key] ?? "")}
-              </Table.Td>
-            ))}
-          </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
+    <Paper withBorder radius="md" p="md">
+      {toolbar ? <Box mb="md">{toolbar}</Box> : null}
+
+      {loading ? <LoadingState /> : null}
+      {!loading && error ? (
+        <ErrorState message={error} onRetry={onRetry} />
+      ) : null}
+      {!loading && !error && rows.length === 0 ? (
+        <EmptyState title={emptyTitle} description={emptyDescription} />
+      ) : null}
+
+      {!loading && !error && rows.length > 0 ? (
+        <ScrollArea>
+          <Table striped highlightOnHover withTableBorder>
+            <Table.Thead>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <Table.Tr key={headerGroup.id}>
+                  {headerGroup.headers.map((header, index) => {
+                    const column = columns[index];
+                    if (!column) {
+                      return null;
+                    }
+
+                    return (
+                      <Table.Th
+                        key={header.id}
+                        style={{
+                          width:
+                            typeof column.width === "string"
+                              ? column.width
+                              : undefined,
+                        }}
+                      >
+                        {renderHeader(column)}
+                      </Table.Th>
+                    );
+                  })}
+                </Table.Tr>
+              ))}
+            </Table.Thead>
+            <Table.Tbody>
+              {table.getRowModel().rows.map((row) => (
+                <Table.Tr key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <Table.Td key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </Table.Td>
+                  ))}
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+      ) : null}
+    </Paper>
   );
 }
