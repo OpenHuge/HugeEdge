@@ -59,7 +59,8 @@
     "codespaces": {
       "openFiles": [
         "README.md",
-        "apps/web/src/router.tsx",
+        "apps/web/src/routes/login.tsx",
+        "apps/web/src/routes/admin.overview.tsx",
         "internal/platform/app.go"
       ]
     },

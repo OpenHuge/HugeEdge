@@ -10,8 +10,11 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "dev:api": "go run ./apps/api/cmd/api",
+    "dev:web": "pnpm --filter @hugeedge/web dev",
     "generate": "pnpm --filter @hugeedge/api-client generate",
     "lint": "biome check .",
+    "smoke": "playwright test",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "validate:capabilities": "tsx infra/scripts/validate-json.ts contracts/capabilities/schema.json contracts/capabilities/example.json",
@@ -20,6 +23,7 @@
     "validate:probe-profiles": "tsx infra/scripts/validate-json.ts contracts/ebpf/probe-profile.schema.json contracts/ebpf/example-profile.json"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@biomejs/biome": "2.4.12",
     "@changesets/cli": "2.29.8",
     "@types/node": "24.10.1",

@@ -17,6 +17,7 @@ ln -sfn "${PERSISTED_CONFIG_PATH}" "${HOME}/.codex/config.toml"
 corepack enable
 corepack prepare pnpm@10.33.0 --activate
 pnpm install --frozen-lockfile
+pnpm exec playwright install chromium
 
 go install github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
 go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.0

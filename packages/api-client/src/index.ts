@@ -1,85 +1,83 @@
 import { z } from "zod";
 
-export type AuthTokens = {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-};
-
-export type Actor = {
-  id: string;
-  email: string;
-  tenantId: string;
-  roleIds: string[];
-  sessionId: string;
-};
-
-export type Tenant = {
-  id: string;
-  name: string;
-  slug: string;
-  status: string;
-  createdAt: string;
-};
-
-export type Node = {
-  id: string;
-  tenantId: string;
-  name: string;
-  status: string;
-  adapterName: "xray-adapter";
-  lastHeartbeatAt?: string;
-  createdAt: string;
-};
-
-export type AuditLog = {
-  id: string;
-  action: string;
-  actorId: string;
-  tenantId?: string;
-  metadata?: Record<string, unknown>;
-  createdAt: string;
-};
-
-export type Capability = {
-  name: string;
-  version: string;
-  source: string;
-};
-
-export type BootstrapToken = {
-  token: string;
-  expiresAt: string;
-};
-
-export type Provider = {
-  id: string;
-  name: string;
-  slug: string;
-};
-
-export type Region = {
-  id: string;
-  providerId: string;
-  name: string;
-  code: string;
-};
-
-export class HugeEdgeApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "HugeEdgeApiError";
-  }
-}
-
-const tokenSchema = z.object({
+const authTokensSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
   expiresIn: z.number(),
 });
+
+const actorSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  tenantId: z.string(),
+  roleIds: z.array(z.string()),
+  sessionId: z.string(),
+});
+
+const tenantSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  status: z.string(),
+  createdAt: z.string(),
+});
+
+const nodeSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  name: z.string(),
+  status: z.string(),
+  adapterName: z.string(),
+  lastHeartbeatAt: z.string().optional(),
+  createdAt: z.string(),
+});
+
+const auditLogSchema = z.object({
+  id: z.string(),
+  action: z.string(),
+  actorId: z.string(),
+  tenantId: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  createdAt: z.string(),
+});
+
+const capabilitySchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  source: z.string(),
+});
+
+const providerSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+});
+
+const regionSchema = z.object({
+  id: z.string(),
+  providerId: z.string(),
+  name: z.string(),
+  code: z.string(),
+});
+
+const bootstrapTokenSchema = z.object({
+  token: z.string(),
+  expiresAt: z.string(),
+});
+
+const apiErrorResponseSchema = z.object({
+  error: z.string().optional(),
+});
+
+export type AuthTokens = z.infer<typeof authTokensSchema>;
+export type Actor = z.infer<typeof actorSchema>;
+export type Tenant = z.infer<typeof tenantSchema>;
+export type Node = z.infer<typeof nodeSchema>;
+export type AuditLog = z.infer<typeof auditLogSchema>;
+export type Capability = z.infer<typeof capabilitySchema>;
+export type Provider = z.infer<typeof providerSchema>;
+export type Region = z.infer<typeof regionSchema>;
+export type BootstrapToken = z.infer<typeof bootstrapTokenSchema>;
 
 export type TokenStore = {
   getAccessToken(): string | undefined;
@@ -87,6 +85,46 @@ export type TokenStore = {
   setTokens(tokens: AuthTokens): void;
   clear(): void;
 };
+
+export type RequestOptions = {
+  method?: string;
+  body?: unknown;
+  auth?: boolean;
+  retry?: boolean;
+  signal?: AbortSignal;
+};
+
+export class HugeEdgeApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly body?: unknown,
+  ) {
+    super(message);
+    this.name = "HugeEdgeApiError";
+  }
+
+  static async fromResponse(response: Response) {
+    const text = await response.text();
+    let body: unknown = undefined;
+
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+    }
+
+    const parsed = apiErrorResponseSchema.safeParse(body);
+    const message =
+      parsed.success && parsed.data.error
+        ? parsed.data.error
+        : `HugeEdge API request failed with status ${response.status}`;
+
+    return new HugeEdgeApiError(message, response.status, body);
+  }
+}
 
 export class BrowserTokenStore implements TokenStore {
   getAccessToken() {
@@ -124,30 +162,34 @@ export class HugeEdgeClient {
     private readonly tokenStore?: TokenStore,
   ) {}
 
-  async login(email: string, password: string) {
-    const tokens = tokenSchema.parse(
+  async login(email: string, password: string, signal?: AbortSignal) {
+    const tokens = authTokensSchema.parse(
       await this.request("/v1/auth/login", {
         method: "POST",
         body: { email, password },
         auth: false,
+        signal,
       }),
     );
     this.tokenStore?.setTokens(tokens);
     return tokens;
   }
 
-  async refresh() {
+  async refresh(signal?: AbortSignal) {
     const refreshToken = this.tokenStore?.getRefreshToken();
     if (!refreshToken) {
       this.tokenStore?.clear();
-      throw new Error("missing refresh token");
+      throw new HugeEdgeApiError("missing refresh token", 401);
     }
+
     try {
-      const tokens = tokenSchema.parse(
+      const tokens = authTokensSchema.parse(
         await this.request("/v1/auth/refresh", {
           method: "POST",
           body: { refreshToken },
           auth: false,
+          retry: false,
+          signal,
         }),
       );
       this.tokenStore?.setTokens(tokens);
@@ -158,68 +200,94 @@ export class HugeEdgeClient {
     }
   }
 
-  async logout() {
-    await this.request("/v1/auth/logout", { method: "POST" });
-    this.tokenStore?.clear();
+  async logout(signal?: AbortSignal) {
+    try {
+      await this.request("/v1/auth/logout", {
+        method: "POST",
+        retry: false,
+        signal,
+      });
+    } catch (error) {
+      if (!(error instanceof HugeEdgeApiError) || error.status !== 401) {
+        throw error;
+      }
+    } finally {
+      this.tokenStore?.clear();
+    }
   }
 
-  me() {
-    return this.request<Actor>("/v1/app/me");
+  me(signal?: AbortSignal) {
+    return this.request("/v1/app/me", { signal }).then((data) =>
+      actorSchema.parse(data),
+    );
   }
 
-  tenants() {
-    return this.request<Tenant[]>("/v1/admin/tenants");
+  tenants(signal?: AbortSignal) {
+    return this.request("/v1/admin/tenants", { signal }).then((data) =>
+      z.array(tenantSchema).parse(data),
+    );
   }
 
-  tenant(id: string) {
-    return this.request<Tenant>(`/v1/admin/tenants/${id}`);
+  tenant(tenantId: string, signal?: AbortSignal) {
+    return this.request(`/v1/admin/tenants/${tenantId}`, { signal }).then(
+      (data) => tenantSchema.parse(data),
+    );
   }
 
-  createTenant(input: { name: string; slug: string }) {
-    return this.request<Tenant>("/v1/admin/tenants", {
+  createTenant(input: { name: string; slug: string }, signal?: AbortSignal) {
+    return this.request("/v1/admin/tenants", {
       method: "POST",
       body: input,
-    });
+      signal,
+    }).then((data) => tenantSchema.parse(data));
   }
 
-  nodes() {
-    return this.request<Node[]>("/v1/admin/nodes");
+  nodes(signal?: AbortSignal) {
+    return this.request("/v1/admin/nodes", { signal }).then((data) =>
+      z.array(nodeSchema).parse(data),
+    );
   }
 
-  node(id: string) {
-    return this.request<Node>(`/v1/admin/nodes/${id}`);
+  node(nodeId: string, signal?: AbortSignal) {
+    return this.request(`/v1/admin/nodes/${nodeId}`, { signal }).then((data) =>
+      nodeSchema.parse(data),
+    );
   }
 
-  auditLogs() {
-    return this.request<AuditLog[]>("/v1/admin/audit-logs");
+  auditLogs(signal?: AbortSignal) {
+    return this.request("/v1/admin/audit-logs", { signal }).then((data) =>
+      z.array(auditLogSchema).parse(data),
+    );
   }
 
-  capabilities() {
-    return this.request<Capability[]>("/v1/admin/capabilities");
+  capabilities(signal?: AbortSignal) {
+    return this.request("/v1/admin/capabilities", { signal }).then((data) =>
+      z.array(capabilitySchema).parse(data),
+    );
   }
 
-  providers() {
-    return this.request<Provider[]>("/v1/admin/providers");
+  providers(signal?: AbortSignal) {
+    return this.request("/v1/admin/providers", { signal }).then((data) =>
+      z.array(providerSchema).parse(data),
+    );
   }
 
-  regions() {
-    return this.request<Region[]>("/v1/admin/regions");
+  regions(signal?: AbortSignal) {
+    return this.request("/v1/admin/regions", { signal }).then((data) =>
+      z.array(regionSchema).parse(data),
+    );
   }
 
-  createBootstrapToken() {
-    return this.request<BootstrapToken>("/v1/admin/nodes/bootstrap-tokens", {
+  createBootstrapToken(signal?: AbortSignal) {
+    return this.request("/v1/admin/nodes/bootstrap-tokens", {
       method: "POST",
-    });
+      signal,
+    }).then((data) => bootstrapTokenSchema.parse(data));
   }
 
   private async request<T = unknown>(
     path: string,
-    options: {
-      method?: string;
-      body?: unknown;
-      auth?: boolean;
-      retry?: boolean;
-    } = {},
+    options: RequestOptions = {},
   ): Promise<T> {
     const headers = new Headers({ Accept: "application/json" });
     if (options.body !== undefined) {
@@ -231,43 +299,37 @@ export class HugeEdgeClient {
         headers.set("Authorization", `Bearer ${token}`);
       }
     }
+
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: options.method ?? "GET",
       headers,
       body:
         options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: options.signal,
     });
+
     if (
       response.status === 401 &&
       options.retry !== false &&
       options.auth !== false
     ) {
       try {
-        await this.refresh();
+        await this.refresh(options.signal);
         return this.request<T>(path, { ...options, retry: false });
-      } catch (error) {
+      } catch (refreshError) {
         this.tokenStore?.clear();
-        throw error;
+        throw refreshError;
       }
     }
+
     if (!response.ok) {
-      throw new HugeEdgeApiError(response.status, await errorMessage(response));
+      throw await HugeEdgeApiError.fromResponse(response);
     }
+
     if (response.status === 204) {
       return undefined as T;
     }
+
     return (await response.json()) as T;
   }
-}
-
-async function errorMessage(response: Response) {
-  try {
-    const body = (await response.json()) as { error?: unknown };
-    if (typeof body.error === "string" && body.error !== "") {
-      return body.error;
-    }
-  } catch {
-    // Fall back to the status text below.
-  }
-  return `HugeEdge API request failed: ${response.status}`;
 }

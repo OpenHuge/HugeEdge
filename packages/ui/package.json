@@ -3,8 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": {
+      "types": "./src/index.tsx",
+      "import": "./src/index.tsx"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
@@ -12,6 +18,7 @@
   },
   "dependencies": {
     "@mantine/core": "9.0.2",
+    "@tanstack/react-table": "8.21.3",
     "lucide-react": "1.8.0",
     "react": "19.2.5",
     "react-dom": "19.2.5"

@@ -1,39 +1,68 @@
 # HugeEdge
 
-HugeEdge is a Phase 0 + Phase 1 monorepo for a composable secure edge access control plane.
+HugeEdge is a monorepo for a secure edge access control plane. The current working surface includes:
 
-The current codebase initializes:
+- a Go admin API backed by Postgres
+- a TanStack Start + Mantine operator panel
+- workspace packages for API client, UI primitives, config, and shared schemas
+- a modular Go control-plane API plus thin `worker`, `ext-runtime`, and `agent` binaries
+- checked-in OpenAPI, database migrations, contracts, and Continue checks under `.continue/checks/`
+- local Docker orchestration for Postgres and the surrounding control-plane services
 
-- a modular Go control-plane API
-- thin `worker`, `ext-runtime`, and `agent` binaries
-- a TanStack/Mantine operator shell
-- repo-native Continue checks in `.continue/checks/`
-- checked-in OpenAPI, database migrations, and contract schemas
-- local Docker orchestration for Postgres, Redis, NATS JetStream, MinIO, API, worker, extension runtime, and web
+## Quick Start
 
-## Status
-
-This repository now contains the first implementation skeleton. It is control-plane first and intentionally defers production policy simulation, WASM execution, eBPF loading, billing integrations, and full remediation engines.
-
-## Day-One Commands
+Install dependencies:
 
 ```sh
 make setup
+```
+
+Run the full local stack with Docker:
+
+```sh
 make dev
+```
+
+The operator panel is available at `http://localhost:3000` and the API at `http://localhost:8080`.
+
+Local demo credentials:
+
+- email: `admin@hugeedge.local`
+- password: `hugeedge`
+
+The first successful login bootstraps the local admin account.
+
+## Focused Development
+
+For frontend + API work, start only Postgres and migrations in Docker, then run the app processes directly:
+
+```sh
+docker compose -f infra/docker/docker-compose.yml up -d postgres
+docker compose -f infra/docker/docker-compose.yml run --rm migrate
+pnpm dev:web
+pnpm dev:api
+```
+
+Useful commands:
+
+```sh
 pnpm generate
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm smoke
 pnpm validate:capabilities
 pnpm validate:policy-packs
 pnpm validate:wasm-artifacts
 pnpm validate:probe-profiles
 ```
 
+`pnpm smoke` starts Postgres + migrations, launches the real API and web app locally, and runs the Playwright operator smoke flow.
+
 ## Continue Checks
 
-HugeEdge now carries source-controlled Continue checks under [`.continue/checks/`](./.continue/checks/), following Continue's repository-native PR check model. The initial checks cover:
+HugeEdge carries source-controlled Continue checks under [`.continue/checks/`](./.continue/checks/). The initial checks cover:
 
 - control-plane API, auth, audit, and generated client alignment
 - migration and sqlc/store safety
@@ -51,30 +80,29 @@ Then run Continue's local check workflow from your agent session after editing c
 
 The Go toolchain target is `go1.26.2`. If Go is not installed locally, the Docker stack uses the pinned `golang:1.26.2` image.
 
-## What the Spec Covers
+## Codespaces / Devcontainer
 
-- product strategy and market input
-- product positioning and personas
-- platform architecture
-- monorepo and backend structure
-- node agent and runtime model
-- frontend panel design
-- data model and API contracts
-- security, billing, observability, and roadmap
-- implementation-readiness guidance for engineering kickoff
+The devcontainer installs:
+
+- Node `24.11.1`
+- Go `1.26.2`
+- `pnpm`
+- Playwright Chromium
+- `migrate` and `sqlc`
+
+On first create, the workspace opens the login route, overview route, and API auth handlers so the operator loop is immediately visible.
 
 ## Implemented Surface
 
-- Auth: JWT-first login, refresh rotation, logout, current actor lookup, bcrypt password hashing, roles and membership schema.
-- Tenancy: tenant list, create, and detail.
-- Fleet: node list/detail, bootstrap token issuance, agent register/renew/heartbeat/capabilities endpoints.
-- System: provider and region seed APIs, capability registry, audit listing.
-- Contracts: capability manifests, `xray-adapter`, WasmEdge plugin manifests, eBPF probe profile fallback modes, remediation policy placeholders.
-- Infra: `golang-migrate` migrations, `sqlc.yaml`, Docker Compose, and GitHub Actions CI.
+- Auth: login, refresh rotation, logout, current actor lookup, and session-aware UI guards.
+- Operator admin: overview, tenants, tenant detail, nodes, node detail, audit, and system data pages.
+- Fleet: bootstrap token issuance plus agent register/renew/heartbeat/capabilities endpoints.
+- System: provider, region, capability, and audit APIs.
+- Contracts and infra: OpenAPI specs, SQL migrations, Docker Compose, and contract validation scripts.
 
-## Entry Point
+## Product Docs
 
-Start with the spec package in [docs/README.md](./docs/README.md).
+Start with [docs/README.md](./docs/README.md).
 
 Suggested reading order:
 
@@ -83,21 +111,7 @@ Suggested reading order:
 3. [docs/02-architecture.md](./docs/02-architecture.md)
 4. [docs/14-implementation-readiness.md](./docs/14-implementation-readiness.md)
 
-## Current Design Direction
-
-HugeEdge is specified as:
-
-- a composable secure edge access platform
-- a governed control plane with extension boundaries
-- an architecture that supports policy-driven self-healing and advanced operator workflows
-
-It is not specified as:
-
-- a consumer VPN product
-- a stealth or circumvention system
-- a fully implemented codebase
-
 ## Scope Note
 
-This spec describes a compliant secure remote access and edge orchestration platform.
+HugeEdge is specified as a compliant secure remote access and edge orchestration platform.
 It does not include censorship-evasion, stealth transport design, fingerprint spoofing, or anti-detection features.
