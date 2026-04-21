@@ -17,11 +17,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := client.Register(ctx); err != nil {
-		slog.Warn("agent registration failed", "error", err)
-	}
-	if err := client.PublishCapabilities(ctx); err != nil {
-		slog.Warn("capability publish failed", "error", err)
+	if err := client.RunCycle(ctx); err != nil {
+		slog.Warn("initial agent cycle failed", "error", err)
 	}
 
 	ticker := time.NewTicker(cfg.HeartbeatInterval)
@@ -32,8 +29,8 @@ func main() {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := client.Heartbeat(ctx); err != nil {
-				slog.Warn("heartbeat failed", "error", err)
+			if err := client.RunCycle(ctx); err != nil {
+				slog.Warn("agent cycle failed", "error", err)
 			}
 		}
 	}

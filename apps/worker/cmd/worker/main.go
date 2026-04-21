@@ -7,14 +7,18 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/hugeedge/hugeedge/internal/platform"
 	"github.com/hugeedge/hugeedge/internal/workflows"
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	runner := workflows.NewRunner()
-	slog.Info("worker started", "nats_url", getenv("NATS_URL", "nats://localhost:4222"))
+	cfg := platform.LoadConfig()
+	app := platform.NewApp(cfg)
+	defer app.Close()
+	runner := workflows.NewRunner(app.Store())
+	slog.Info("worker started", "nats_url", getenv("NATS_URL", "nats://localhost:4222"), "database_url", cfg.DatabaseURL)
 	runner.Run(ctx)
 }
 

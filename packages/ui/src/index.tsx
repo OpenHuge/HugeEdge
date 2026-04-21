@@ -12,11 +12,21 @@ import type { ReactNode } from "react";
 
 export function StatusBadge({ status }: { status: string }) {
   const color =
-    status === "active" || status === "ready"
+    status === "active" ||
+    status === "ready" ||
+    status === "online" ||
+    status === "succeeded"
       ? "green"
-      : status === "registered"
+      : status === "registered" ||
+          status === "pending" ||
+          status === "awaiting_apply" ||
+          status === "in_progress"
         ? "blue"
-        : "gray";
+        : status === "degraded" ||
+            status === "failed" ||
+            status === "rolled_back"
+          ? "yellow"
+          : "gray";
   return <Badge color={color}>{status}</Badge>;
 }
 

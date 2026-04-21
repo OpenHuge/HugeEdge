@@ -56,13 +56,22 @@ type Tenant struct {
 }
 
 type Node struct {
-	ID              string     `json:"id"`
-	TenantID        string     `json:"tenantId"`
-	Name            string     `json:"name"`
-	Status          string     `json:"status"`
-	AdapterName     string     `json:"adapterName"`
-	LastHeartbeatAt *time.Time `json:"lastHeartbeatAt,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
+	ID                   string     `json:"id"`
+	TenantID             string     `json:"tenantId"`
+	Name                 string     `json:"name"`
+	Status               string     `json:"status"`
+	AdapterName          string     `json:"adapterName"`
+	AgentVersion         string     `json:"agentVersion"`
+	RuntimeVersion       string     `json:"runtimeVersion"`
+	HealthStatus         string     `json:"healthStatus"`
+	HealthScore          int        `json:"healthScore"`
+	CurrentConfigVersion *int       `json:"currentConfigVersion,omitempty"`
+	DesiredConfigVersion *int       `json:"desiredConfigVersion,omitempty"`
+	LastApplyStatus      string     `json:"lastApplyStatus,omitempty"`
+	LastApplyMessage     string     `json:"lastApplyMessage,omitempty"`
+	LastApplyAt          *time.Time `json:"lastApplyAt,omitempty"`
+	LastHeartbeatAt      *time.Time `json:"lastHeartbeatAt,omitempty"`
+	CreatedAt            time.Time  `json:"createdAt"`
 }
 
 type BootstrapToken struct {
@@ -96,6 +105,43 @@ type Region struct {
 	ProviderID string `json:"providerId"`
 	Name       string `json:"name"`
 	Code       string `json:"code"`
+}
+
+type Rollout struct {
+	ID                  string         `json:"id"`
+	TenantID            string         `json:"tenantId"`
+	NodeID              string         `json:"nodeId"`
+	NodeName            string         `json:"nodeName"`
+	BundleVersion       int            `json:"bundleVersion"`
+	Config              map[string]any `json:"config,omitempty"`
+	Hash                string         `json:"hash"`
+	AdapterName         string         `json:"adapterName"`
+	Status              string         `json:"status"`
+	Note                string         `json:"note"`
+	CreatedBy           string         `json:"createdBy,omitempty"`
+	RollbackOfRolloutID string         `json:"rollbackOfRolloutId,omitempty"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	CompletedAt         *time.Time     `json:"completedAt,omitempty"`
+	LastApplyStatus     string         `json:"lastApplyStatus,omitempty"`
+	LastApplyMessage    string         `json:"lastApplyMessage,omitempty"`
+	HealthStatus        string         `json:"healthStatus,omitempty"`
+	HealthScore         int            `json:"healthScore,omitempty"`
+	AgentVersion        string         `json:"agentVersion,omitempty"`
+	RuntimeVersion      string         `json:"runtimeVersion,omitempty"`
+}
+
+type ConfigBundle struct {
+	BundleVersion int            `json:"bundleVersion"`
+	AdapterName   string         `json:"adapterName"`
+	Config        map[string]any `json:"config"`
+	Hash          string         `json:"hash"`
+	IssuedAt      time.Time      `json:"issuedAt"`
+}
+
+type ConfigReport struct {
+	TenantID string
+	Action   string
+	Metadata map[string]any
 }
 
 func NewStore(db *pgxpool.Pool) *Store {
@@ -469,30 +515,57 @@ func (s *Store) ListNodes(ctx context.Context) ([]Node, error) {
 	nodes := make([]Node, 0, len(rows))
 	for _, row := range rows {
 		nodes = append(nodes, Node{
-			ID:              uuidString(row.ID),
-			TenantID:        uuidString(row.TenantID),
-			Name:            row.Name,
-			Status:          row.Status,
-			AdapterName:     row.AdapterName,
-			LastHeartbeatAt: timePtrFromTimestamptz(row.LastHeartbeatAt),
-			CreatedAt:       timeFromTimestamptz(row.CreatedAt),
+			ID:                   uuidString(row.ID),
+			TenantID:             uuidString(row.TenantID),
+			Name:                 row.Name,
+			Status:               row.Status,
+			AdapterName:          row.AdapterName,
+			AgentVersion:         row.AgentVersion,
+			RuntimeVersion:       row.RuntimeVersion,
+			HealthStatus:         row.HealthStatus,
+			HealthScore:          int(row.HealthScore),
+			CurrentConfigVersion: intPtrFromInt4(row.CurrentConfigVersion),
+			DesiredConfigVersion: intPtrFromInt4(row.DesiredConfigVersion),
+			LastApplyStatus:      textFromText(row.LastApplyStatus),
+			LastApplyMessage:     textFromText(row.LastApplyMessage),
+			LastApplyAt:          timePtrFromTimestamptz(row.LastApplyAt),
+			LastHeartbeatAt:      timePtrFromTimestamptz(row.LastHeartbeatAt),
+			CreatedAt:            timeFromTimestamptz(row.CreatedAt),
 		})
 	}
 	return nodes, nil
 }
 
 func (s *Store) Node(ctx context.Context, id string) (Node, error) {
-	var node Node
-	var lastHeartbeatAt pgtype.Timestamptz
-	err := s.db.QueryRow(ctx,
-		`SELECT id::text, tenant_id::text, name, status, adapter_name, last_heartbeat_at, created_at FROM nodes WHERE id = $1`,
-		id,
-	).Scan(&node.ID, &node.TenantID, &node.Name, &node.Status, &node.AdapterName, &lastHeartbeatAt, &node.CreatedAt)
+	nodeID, err := uuidParam(id)
+	if err != nil {
+		return Node{}, err
+	}
+	row, err := s.queries.GetNode(ctx, nodeID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Node{}, ErrNotFound
 	}
-	node.LastHeartbeatAt = timePtrFromTimestamptz(lastHeartbeatAt)
-	return node, err
+	if err != nil {
+		return Node{}, err
+	}
+	return Node{
+		ID:                   uuidString(row.ID),
+		TenantID:             uuidString(row.TenantID),
+		Name:                 row.Name,
+		Status:               row.Status,
+		AdapterName:          row.AdapterName,
+		AgentVersion:         row.AgentVersion,
+		RuntimeVersion:       row.RuntimeVersion,
+		HealthStatus:         row.HealthStatus,
+		HealthScore:          int(row.HealthScore),
+		CurrentConfigVersion: intPtrFromInt4(row.CurrentConfigVersion),
+		DesiredConfigVersion: intPtrFromInt4(row.DesiredConfigVersion),
+		LastApplyStatus:      textFromText(row.LastApplyStatus),
+		LastApplyMessage:     textFromText(row.LastApplyMessage),
+		LastApplyAt:          timePtrFromTimestamptz(row.LastApplyAt),
+		LastHeartbeatAt:      timePtrFromTimestamptz(row.LastHeartbeatAt),
+		CreatedAt:            timeFromTimestamptz(row.CreatedAt),
+	}, nil
 }
 
 func (s *Store) CreateBootstrapToken(ctx context.Context, tenantID string) (BootstrapToken, error) {
@@ -572,12 +645,15 @@ func (s *Store) RegisterNode(ctx context.Context, bootstrapToken string) (Node, 
 
 	var node Node
 	err = tx.QueryRow(ctx,
-		`INSERT INTO nodes (id, tenant_id, name, status, adapter_name)
-		 VALUES ($1, $2, $3, 'registered', 'xray-adapter')
-		 RETURNING id::text, tenant_id::text, name, status, adapter_name, created_at`,
+		`INSERT INTO nodes (id, tenant_id, name, status, adapter_name, agent_version, runtime_version, health_status, health_score)
+		 VALUES ($1, $2, $3, 'registered', 'xray-adapter', '0.1.0', '0.1.0', 'offline', 0)
+		 RETURNING id::text, tenant_id::text, name, status, adapter_name, agent_version, runtime_version, health_status, health_score, created_at`,
 		uuid.NewString(), tenantID, fmt.Sprintf("agent-%d", count+1),
-	).Scan(&node.ID, &node.TenantID, &node.Name, &node.Status, &node.AdapterName, &node.CreatedAt)
+	).Scan(&node.ID, &node.TenantID, &node.Name, &node.Status, &node.AdapterName, &node.AgentVersion, &node.RuntimeVersion, &node.HealthStatus, &node.HealthScore, &node.CreatedAt)
 	if err != nil {
+		return Node{}, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO node_config_states (node_id) VALUES ($1) ON CONFLICT (node_id) DO NOTHING`, node.ID); err != nil {
 		return Node{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -661,7 +737,23 @@ func (s *Store) HeartbeatNode(ctx context.Context, nodeID string) error {
 	if nodeID == "" {
 		return nil
 	}
-	tag, err := s.db.Exec(ctx, `UPDATE nodes SET status = 'ready', last_heartbeat_at = now() WHERE id = $1`, nodeID)
+	tag, err := s.db.Exec(ctx,
+		`UPDATE nodes
+		 SET status = 'ready',
+		     last_heartbeat_at = now(),
+		     health_status = CASE
+		       WHEN COALESCE((SELECT last_apply_status FROM node_config_states WHERE node_id = nodes.id), '') IN ('failed', 'rolled_back')
+		         THEN 'degraded'
+		       ELSE 'online'
+		     END,
+		     health_score = CASE
+		       WHEN COALESCE((SELECT last_apply_status FROM node_config_states WHERE node_id = nodes.id), '') IN ('failed', 'rolled_back')
+		         THEN 70
+		       ELSE 100
+		     END
+		 WHERE id = $1`,
+		nodeID,
+	)
 	if err != nil {
 		return err
 	}
@@ -751,4 +843,26 @@ func timePtrFromTimestamptz(value pgtype.Timestamptz) *time.Time {
 		return nil
 	}
 	return &value.Time
+}
+
+func intPtrFromInt4(value pgtype.Int4) *int {
+	if !value.Valid {
+		return nil
+	}
+	converted := int(value.Int32)
+	return &converted
+}
+
+func intFromInt4(value pgtype.Int4) int {
+	if !value.Valid {
+		return 0
+	}
+	return int(value.Int32)
+}
+
+func textFromText(value pgtype.Text) string {
+	if !value.Valid {
+		return ""
+	}
+	return value.String
 }

@@ -97,12 +97,24 @@ describe("HugeEdgeClient", () => {
 
     await client.tenant("tenant-1");
     await client.node("node-1");
+    await client.rollouts("node-1");
+    await client.rollout("rollout-1");
+    await client.createRollout({
+      nodeId: "node-1",
+      adapterName: "xray-adapter",
+      config: { mode: "baseline" },
+    });
+    await client.rollbackRollout("rollout-1");
     await client.providers();
     await client.regions();
 
     expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
       "http://api.test/v1/admin/tenants/tenant-1",
       "http://api.test/v1/admin/nodes/node-1",
+      "http://api.test/v1/admin/rollouts?nodeId=node-1",
+      "http://api.test/v1/admin/rollouts/rollout-1",
+      "http://api.test/v1/admin/rollouts",
+      "http://api.test/v1/admin/rollouts/rollout-1/rollback",
       "http://api.test/v1/admin/providers",
       "http://api.test/v1/admin/regions",
     ]);

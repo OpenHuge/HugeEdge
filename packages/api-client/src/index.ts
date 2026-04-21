@@ -28,8 +28,40 @@ export type Node = {
   name: string;
   status: string;
   adapterName: "xray-adapter";
+  agentVersion: string;
+  runtimeVersion: string;
+  healthStatus: string;
+  healthScore: number;
+  currentConfigVersion?: number;
+  desiredConfigVersion?: number;
+  lastApplyStatus?: string;
+  lastApplyMessage?: string;
+  lastApplyAt?: string;
   lastHeartbeatAt?: string;
   createdAt: string;
+};
+
+export type Rollout = {
+  id: string;
+  tenantId: string;
+  nodeId: string;
+  nodeName: string;
+  bundleVersion: number;
+  config?: Record<string, unknown>;
+  hash: string;
+  adapterName: "xray-adapter";
+  status: string;
+  note: string;
+  createdBy?: string;
+  rollbackOfRolloutId?: string;
+  createdAt: string;
+  completedAt?: string;
+  lastApplyStatus?: string;
+  lastApplyMessage?: string;
+  healthStatus?: string;
+  healthScore?: number;
+  agentVersion?: string;
+  runtimeVersion?: string;
 };
 
 export type AuditLog = {
@@ -208,6 +240,35 @@ export class HugeEdgeClient {
 
   createBootstrapToken() {
     return this.request<BootstrapToken>("/v1/admin/nodes/bootstrap-tokens", {
+      method: "POST",
+    });
+  }
+
+  rollouts(nodeId?: string) {
+    const query = nodeId
+      ? `?${new URLSearchParams({ nodeId }).toString()}`
+      : "";
+    return this.request<Rollout[]>(`/v1/admin/rollouts${query}`);
+  }
+
+  rollout(id: string) {
+    return this.request<Rollout>(`/v1/admin/rollouts/${id}`);
+  }
+
+  createRollout(input: {
+    nodeId: string;
+    adapterName: "xray-adapter";
+    config: Record<string, unknown>;
+    note?: string;
+  }) {
+    return this.request<Rollout>("/v1/admin/rollouts", {
+      method: "POST",
+      body: input,
+    });
+  }
+
+  rollbackRollout(id: string) {
+    return this.request<Rollout>(`/v1/admin/rollouts/${id}/rollback`, {
       method: "POST",
     });
   }

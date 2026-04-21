@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HugeEdge Admin API
-  version: 0.1.0
+  version: 0.2.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -108,11 +108,7 @@ paths:
     get:
       operationId: getNode
       parameters:
-        - name: nodeId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/NodeId"
       responses:
         "200":
           description: Node detail
@@ -130,6 +126,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BootstrapToken"
+  /v1/admin/rollouts:
+    get:
+      operationId: listRollouts
+      parameters:
+        - name: nodeId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Config rollouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rollout"
+    post:
+      operationId: createRollout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRolloutRequest"
+      responses:
+        "201":
+          description: Rollout created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rollout"
+  /v1/admin/rollouts/{rolloutId}:
+    get:
+      operationId: getRollout
+      parameters:
+        - $ref: "#/components/parameters/RolloutId"
+      responses:
+        "200":
+          description: Rollout detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rollout"
+  /v1/admin/rollouts/{rolloutId}/rollback:
+    post:
+      operationId: rollbackRollout
+      parameters:
+        - $ref: "#/components/parameters/RolloutId"
+      responses:
+        "201":
+          description: Rollback rollout created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rollout"
   /v1/admin/capabilities:
     get:
       operationId: listCapabilities
@@ -186,6 +239,18 @@ components:
       required: true
       schema:
         type: string
+    NodeId:
+      name: nodeId
+      in: path
+      required: true
+      schema:
+        type: string
+    RolloutId:
+      name: rolloutId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     Actor:
       type: object
@@ -236,6 +301,20 @@ components:
           type: string
         slug:
           type: string
+    CreateRolloutRequest:
+      type: object
+      required: [nodeId, adapterName, config]
+      properties:
+        nodeId:
+          type: string
+        adapterName:
+          type: string
+          const: xray-adapter
+        config:
+          type: object
+          additionalProperties: true
+        note:
+          type: string
     Tenant:
       type: object
       required: [id, name, slug, status, createdAt]
@@ -253,7 +332,17 @@ components:
           format: date-time
     Node:
       type: object
-      required: [id, tenantId, name, status, adapterName, createdAt]
+      required:
+        - id
+        - tenantId
+        - name
+        - status
+        - adapterName
+        - agentVersion
+        - runtimeVersion
+        - healthStatus
+        - healthScore
+        - createdAt
       properties:
         id:
           type: string
@@ -266,12 +355,89 @@ components:
         adapterName:
           type: string
           const: xray-adapter
+        agentVersion:
+          type: string
+        runtimeVersion:
+          type: string
+        healthStatus:
+          type: string
+        healthScore:
+          type: integer
+        currentConfigVersion:
+          type: integer
+        desiredConfigVersion:
+          type: integer
+        lastApplyStatus:
+          type: string
+        lastApplyMessage:
+          type: string
+        lastApplyAt:
+          type: string
+          format: date-time
         lastHeartbeatAt:
           type: string
           format: date-time
         createdAt:
           type: string
           format: date-time
+    Rollout:
+      type: object
+      required:
+        - id
+        - tenantId
+        - nodeId
+        - nodeName
+        - bundleVersion
+        - adapterName
+        - status
+        - note
+        - hash
+        - createdAt
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        nodeId:
+          type: string
+        nodeName:
+          type: string
+        bundleVersion:
+          type: integer
+        config:
+          type: object
+          additionalProperties: true
+        hash:
+          type: string
+        adapterName:
+          type: string
+          const: xray-adapter
+        status:
+          type: string
+        note:
+          type: string
+        createdBy:
+          type: string
+        rollbackOfRolloutId:
+          type: string
+        completedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        lastApplyStatus:
+          type: string
+        lastApplyMessage:
+          type: string
+        healthStatus:
+          type: string
+        healthScore:
+          type: integer
+        agentVersion:
+          type: string
+        runtimeVersion:
+          type: string
     BootstrapToken:
       type: object
       required: [token, expiresAt]

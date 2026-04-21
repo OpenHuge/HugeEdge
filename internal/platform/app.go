@@ -51,6 +51,10 @@ func (a *App) Close() {
 	a.store.Close()
 }
 
+func (a *App) Store() *Store {
+	return a.store
+}
+
 func (a *App) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -77,6 +81,10 @@ func (a *App) Router() http.Handler {
 			r.Get("/admin/nodes", a.listNodes)
 			r.Get("/admin/nodes/{nodeId}", a.getNode)
 			r.Post("/admin/nodes/bootstrap-tokens", a.createBootstrapToken)
+			r.Get("/admin/rollouts", a.listRollouts)
+			r.Post("/admin/rollouts", a.createRollout)
+			r.Get("/admin/rollouts/{rolloutId}", a.getRollout)
+			r.Post("/admin/rollouts/{rolloutId}/rollback", a.rollbackRollout)
 			r.Get("/admin/capabilities", a.listCapabilities)
 			r.Get("/admin/audit-logs", a.listAudit)
 		})
@@ -85,6 +93,8 @@ func (a *App) Router() http.Handler {
 		r.Post("/agent/renew", a.accepted)
 		r.Post("/agent/heartbeat", a.accepted)
 		r.Post("/agent/capabilities", a.accepted)
+		r.Post("/agent/config/next", a.agentConfigNext)
+		r.Post("/agent/config/report", a.agentConfigReport)
 	})
 
 	return cors.AllowAll().Handler(r)
@@ -332,6 +342,113 @@ func (a *App) listAudit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, logs)
 }
 
+func (a *App) listRollouts(w http.ResponseWriter, r *http.Request) {
+	claims := claimsFromContext(r.Context())
+	rollouts, err := a.store.ListRollouts(r.Context(), claims.TenantID, strings.TrimSpace(r.URL.Query().Get("nodeId")))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, rollouts)
+}
+
+func (a *App) createRollout(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		NodeID      string         `json:"nodeId"`
+		AdapterName string         `json:"adapterName"`
+		Config      map[string]any `json:"config"`
+		Note        string         `json:"note"`
+	}
+	if err := decode(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if strings.TrimSpace(req.NodeID) == "" {
+		writeError(w, http.StatusBadRequest, errors.New("nodeId is required"))
+		return
+	}
+	if req.AdapterName == "" {
+		req.AdapterName = "xray-adapter"
+	}
+	if req.AdapterName != "xray-adapter" {
+		writeError(w, http.StatusBadRequest, errors.New("only xray-adapter is supported in this phase"))
+		return
+	}
+	if req.Config == nil {
+		writeError(w, http.StatusBadRequest, errors.New("config is required"))
+		return
+	}
+	claims := claimsFromContext(r.Context())
+	rollout, err := a.store.CreateRollout(
+		r.Context(),
+		claims.TenantID,
+		strings.TrimSpace(req.NodeID),
+		claims.Subject,
+		req.AdapterName,
+		req.Config,
+		req.Note,
+	)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, errors.New("node not found"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := a.store.Audit(r.Context(), "rollout.create", claims.Subject, claims.TenantID, map[string]any{
+		"rolloutId":     rollout.ID,
+		"nodeId":        rollout.NodeID,
+		"bundleVersion": rollout.BundleVersion,
+		"adapterName":   rollout.AdapterName,
+	}); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, rollout)
+}
+
+func (a *App) getRollout(w http.ResponseWriter, r *http.Request) {
+	claims := claimsFromContext(r.Context())
+	rollout, err := a.store.Rollout(r.Context(), claims.TenantID, chi.URLParam(r, "rolloutId"))
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, errors.New("rollout not found"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, rollout)
+}
+
+func (a *App) rollbackRollout(w http.ResponseWriter, r *http.Request) {
+	claims := claimsFromContext(r.Context())
+	rollout, err := a.store.RollbackRollout(r.Context(), claims.TenantID, chi.URLParam(r, "rolloutId"), claims.Subject)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, errors.New("rollout not found"))
+		return
+	}
+	if errors.Is(err, ErrConflict) {
+		writeError(w, http.StatusConflict, errors.New("rollout cannot be rolled back"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := a.store.Audit(r.Context(), "rollout.rollback.create", claims.Subject, claims.TenantID, map[string]any{
+		"rolloutId":           rollout.ID,
+		"rollbackOfRolloutId": rollout.RollbackOfRolloutID,
+		"nodeId":              rollout.NodeID,
+		"bundleVersion":       rollout.BundleVersion,
+	}); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, rollout)
+}
+
 func (a *App) agentRegister(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		BootstrapToken string `json:"bootstrapToken"`
@@ -350,6 +467,103 @@ func (a *App) agentRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, node)
+}
+
+func (a *App) agentConfigNext(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		NodeID               string `json:"nodeId"`
+		CurrentConfigVersion int    `json:"currentConfigVersion"`
+		AgentVersion         string `json:"agentVersion"`
+		RuntimeVersion       string `json:"runtimeVersion"`
+	}
+	if err := decode(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if strings.TrimSpace(req.NodeID) == "" {
+		writeError(w, http.StatusBadRequest, errors.New("nodeId is required"))
+		return
+	}
+	if req.AgentVersion == "" {
+		req.AgentVersion = "0.1.0"
+	}
+	if req.RuntimeVersion == "" {
+		req.RuntimeVersion = "0.1.0"
+	}
+	bundle, err := a.store.NextConfig(r.Context(), strings.TrimSpace(req.NodeID), req.CurrentConfigVersion, req.AgentVersion, req.RuntimeVersion)
+	if errors.Is(err, ErrNotFound) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if bundle == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSON(w, http.StatusOK, bundle)
+}
+
+func (a *App) agentConfigReport(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		NodeID         string `json:"nodeId"`
+		BundleVersion  int    `json:"bundleVersion"`
+		Status         string `json:"status"`
+		Message        string `json:"message"`
+		HealthStatus   string `json:"healthStatus"`
+		HealthScore    int    `json:"healthScore"`
+		AgentVersion   string `json:"agentVersion"`
+		RuntimeVersion string `json:"runtimeVersion"`
+	}
+	if err := decode(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if strings.TrimSpace(req.NodeID) == "" || req.BundleVersion <= 0 {
+		writeError(w, http.StatusBadRequest, errors.New("nodeId and bundleVersion are required"))
+		return
+	}
+	switch req.Status {
+	case "in_progress", "succeeded", "failed", "rolled_back":
+	default:
+		writeError(w, http.StatusBadRequest, errors.New("invalid config report status"))
+		return
+	}
+	if req.AgentVersion == "" {
+		req.AgentVersion = "0.1.0"
+	}
+	if req.RuntimeVersion == "" {
+		req.RuntimeVersion = "0.1.0"
+	}
+	if req.HealthStatus == "" {
+		req.HealthStatus = "offline"
+	}
+	report, err := a.store.ReportConfig(
+		r.Context(),
+		strings.TrimSpace(req.NodeID),
+		req.BundleVersion,
+		req.Status,
+		req.Message,
+		req.HealthStatus,
+		req.HealthScore,
+		req.AgentVersion,
+		req.RuntimeVersion,
+	)
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, errors.New("rollout not found"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := a.store.Audit(r.Context(), report.Action, "", report.TenantID, report.Metadata); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (a *App) accepted(w http.ResponseWriter, r *http.Request) {

@@ -89,6 +89,7 @@ services:
     working_dir: /workspace
     command: /usr/local/go/bin/go run ./apps/worker/cmd/worker
     environment:
+      DATABASE_URL: postgres://hugeedge:hugeedge@postgres:5432/hugeedge?sslmode=disable
       NATS_URL: nats://nats:4222
       REDIS_ADDR: redis:6379
       GOFLAGS: -buildvcs=false

@@ -11,6 +11,172 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getNode = `-- name: GetNode :one
+SELECT
+  n.id,
+  n.tenant_id,
+  n.name,
+  n.status,
+  n.adapter_name,
+  n.agent_version,
+  n.runtime_version,
+  n.health_status,
+  n.health_score,
+  n.last_heartbeat_at,
+  n.created_at,
+  current_bundle.bundle_version AS current_config_version,
+  desired_bundle.bundle_version AS desired_config_version,
+  cs.last_apply_status,
+  cs.last_apply_message,
+  cs.last_apply_at
+FROM nodes n
+LEFT JOIN node_config_states cs ON cs.node_id = n.id
+LEFT JOIN config_bundles current_bundle ON current_bundle.id = cs.current_bundle_id
+LEFT JOIN config_bundles desired_bundle ON desired_bundle.id = cs.desired_bundle_id
+WHERE n.id = $1
+`
+
+type GetNodeRow struct {
+	ID                   pgtype.UUID
+	TenantID             pgtype.UUID
+	Name                 string
+	Status               string
+	AdapterName          string
+	AgentVersion         string
+	RuntimeVersion       string
+	HealthStatus         string
+	HealthScore          int32
+	LastHeartbeatAt      pgtype.Timestamptz
+	CreatedAt            pgtype.Timestamptz
+	CurrentConfigVersion pgtype.Int4
+	DesiredConfigVersion pgtype.Int4
+	LastApplyStatus      pgtype.Text
+	LastApplyMessage     pgtype.Text
+	LastApplyAt          pgtype.Timestamptz
+}
+
+func (q *Queries) GetNode(ctx context.Context, id pgtype.UUID) (GetNodeRow, error) {
+	row := q.db.QueryRow(ctx, getNode, id)
+	var i GetNodeRow
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.Status,
+		&i.AdapterName,
+		&i.AgentVersion,
+		&i.RuntimeVersion,
+		&i.HealthStatus,
+		&i.HealthScore,
+		&i.LastHeartbeatAt,
+		&i.CreatedAt,
+		&i.CurrentConfigVersion,
+		&i.DesiredConfigVersion,
+		&i.LastApplyStatus,
+		&i.LastApplyMessage,
+		&i.LastApplyAt,
+	)
+	return i, err
+}
+
+const getRollout = `-- name: GetRollout :one
+SELECT
+  r.id,
+  r.tenant_id,
+  r.node_id,
+  n.name AS node_name,
+  r.bundle_id,
+  cb.bundle_version,
+  cb.config,
+  cb.hash,
+  r.previous_bundle_id,
+  r.adapter_name,
+  r.status,
+  r.note,
+  r.created_by,
+  r.rollback_of_rollout_id,
+  r.created_at,
+  r.completed_at,
+  latest_apply.status AS last_apply_status,
+  latest_apply.message AS last_apply_message,
+  latest_apply.health_status,
+  latest_apply.health_score,
+  latest_apply.agent_version,
+  latest_apply.runtime_version
+FROM rollouts r
+JOIN nodes n ON n.id = r.node_id
+JOIN config_bundles cb ON cb.id = r.bundle_id
+LEFT JOIN LATERAL (
+  SELECT status, message, health_status, health_score, agent_version, runtime_version
+  FROM node_config_applies
+  WHERE rollout_id = r.id
+  ORDER BY started_at DESC
+  LIMIT 1
+) latest_apply ON TRUE
+WHERE r.tenant_id = $1
+  AND r.id = $2
+`
+
+type GetRolloutParams struct {
+	TenantID pgtype.UUID
+	ID       pgtype.UUID
+}
+
+type GetRolloutRow struct {
+	ID                  pgtype.UUID
+	TenantID            pgtype.UUID
+	NodeID              pgtype.UUID
+	NodeName            string
+	BundleID            pgtype.UUID
+	BundleVersion       int32
+	Config              []byte
+	Hash                string
+	PreviousBundleID    pgtype.UUID
+	AdapterName         string
+	Status              string
+	Note                string
+	CreatedBy           pgtype.UUID
+	RollbackOfRolloutID pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+	CompletedAt         pgtype.Timestamptz
+	LastApplyStatus     string
+	LastApplyMessage    string
+	HealthStatus        string
+	HealthScore         int32
+	AgentVersion        string
+	RuntimeVersion      string
+}
+
+func (q *Queries) GetRollout(ctx context.Context, arg GetRolloutParams) (GetRolloutRow, error) {
+	row := q.db.QueryRow(ctx, getRollout, arg.TenantID, arg.ID)
+	var i GetRolloutRow
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.NodeID,
+		&i.NodeName,
+		&i.BundleID,
+		&i.BundleVersion,
+		&i.Config,
+		&i.Hash,
+		&i.PreviousBundleID,
+		&i.AdapterName,
+		&i.Status,
+		&i.Note,
+		&i.CreatedBy,
+		&i.RollbackOfRolloutID,
+		&i.CreatedAt,
+		&i.CompletedAt,
+		&i.LastApplyStatus,
+		&i.LastApplyMessage,
+		&i.HealthStatus,
+		&i.HealthScore,
+		&i.AgentVersion,
+		&i.RuntimeVersion,
+	)
+	return i, err
+}
+
 const getTenant = `-- name: GetTenant :one
 SELECT id, name, slug, status, created_at
 FROM tenants
@@ -65,28 +231,187 @@ func (q *Queries) ListAuditLogs(ctx context.Context, limit int32) ([]AuditLog, e
 }
 
 const listNodes = `-- name: ListNodes :many
-SELECT id, tenant_id, name, status, adapter_name, last_heartbeat_at, created_at
-FROM nodes
-ORDER BY created_at ASC
+SELECT
+  n.id,
+  n.tenant_id,
+  n.name,
+  n.status,
+  n.adapter_name,
+  n.agent_version,
+  n.runtime_version,
+  n.health_status,
+  n.health_score,
+  n.last_heartbeat_at,
+  n.created_at,
+  current_bundle.bundle_version AS current_config_version,
+  desired_bundle.bundle_version AS desired_config_version,
+  cs.last_apply_status,
+  cs.last_apply_message,
+  cs.last_apply_at
+FROM nodes n
+LEFT JOIN node_config_states cs ON cs.node_id = n.id
+LEFT JOIN config_bundles current_bundle ON current_bundle.id = cs.current_bundle_id
+LEFT JOIN config_bundles desired_bundle ON desired_bundle.id = cs.desired_bundle_id
+ORDER BY n.created_at ASC
 `
 
-func (q *Queries) ListNodes(ctx context.Context) ([]Node, error) {
+type ListNodesRow struct {
+	ID                   pgtype.UUID
+	TenantID             pgtype.UUID
+	Name                 string
+	Status               string
+	AdapterName          string
+	AgentVersion         string
+	RuntimeVersion       string
+	HealthStatus         string
+	HealthScore          int32
+	LastHeartbeatAt      pgtype.Timestamptz
+	CreatedAt            pgtype.Timestamptz
+	CurrentConfigVersion pgtype.Int4
+	DesiredConfigVersion pgtype.Int4
+	LastApplyStatus      pgtype.Text
+	LastApplyMessage     pgtype.Text
+	LastApplyAt          pgtype.Timestamptz
+}
+
+func (q *Queries) ListNodes(ctx context.Context) ([]ListNodesRow, error) {
 	rows, err := q.db.Query(ctx, listNodes)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Node
+	var items []ListNodesRow
 	for rows.Next() {
-		var i Node
+		var i ListNodesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.TenantID,
 			&i.Name,
 			&i.Status,
 			&i.AdapterName,
+			&i.AgentVersion,
+			&i.RuntimeVersion,
+			&i.HealthStatus,
+			&i.HealthScore,
 			&i.LastHeartbeatAt,
 			&i.CreatedAt,
+			&i.CurrentConfigVersion,
+			&i.DesiredConfigVersion,
+			&i.LastApplyStatus,
+			&i.LastApplyMessage,
+			&i.LastApplyAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRollouts = `-- name: ListRollouts :many
+SELECT
+  r.id,
+  r.tenant_id,
+  r.node_id,
+  n.name AS node_name,
+  r.bundle_id,
+  cb.bundle_version,
+  cb.config,
+  cb.hash,
+  r.previous_bundle_id,
+  r.adapter_name,
+  r.status,
+  r.note,
+  r.created_by,
+  r.rollback_of_rollout_id,
+  r.created_at,
+  r.completed_at,
+  latest_apply.status AS last_apply_status,
+  latest_apply.message AS last_apply_message,
+  latest_apply.health_status,
+  latest_apply.health_score,
+  latest_apply.agent_version,
+  latest_apply.runtime_version
+FROM rollouts r
+JOIN nodes n ON n.id = r.node_id
+JOIN config_bundles cb ON cb.id = r.bundle_id
+LEFT JOIN LATERAL (
+  SELECT status, message, health_status, health_score, agent_version, runtime_version
+  FROM node_config_applies
+  WHERE rollout_id = r.id
+  ORDER BY started_at DESC
+  LIMIT 1
+) latest_apply ON TRUE
+WHERE r.tenant_id = $1
+  AND ($2::uuid IS NULL OR r.node_id = $2::uuid)
+ORDER BY r.created_at DESC
+`
+
+type ListRolloutsParams struct {
+	TenantID pgtype.UUID
+	Column2  pgtype.UUID
+}
+
+type ListRolloutsRow struct {
+	ID                  pgtype.UUID
+	TenantID            pgtype.UUID
+	NodeID              pgtype.UUID
+	NodeName            string
+	BundleID            pgtype.UUID
+	BundleVersion       int32
+	Config              []byte
+	Hash                string
+	PreviousBundleID    pgtype.UUID
+	AdapterName         string
+	Status              string
+	Note                string
+	CreatedBy           pgtype.UUID
+	RollbackOfRolloutID pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+	CompletedAt         pgtype.Timestamptz
+	LastApplyStatus     string
+	LastApplyMessage    string
+	HealthStatus        string
+	HealthScore         int32
+	AgentVersion        string
+	RuntimeVersion      string
+}
+
+func (q *Queries) ListRollouts(ctx context.Context, arg ListRolloutsParams) ([]ListRolloutsRow, error) {
+	rows, err := q.db.Query(ctx, listRollouts, arg.TenantID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRolloutsRow
+	for rows.Next() {
+		var i ListRolloutsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.NodeID,
+			&i.NodeName,
+			&i.BundleID,
+			&i.BundleVersion,
+			&i.Config,
+			&i.Hash,
+			&i.PreviousBundleID,
+			&i.AdapterName,
+			&i.Status,
+			&i.Note,
+			&i.CreatedBy,
+			&i.RollbackOfRolloutID,
+			&i.CreatedAt,
+			&i.CompletedAt,
+			&i.LastApplyStatus,
+			&i.LastApplyMessage,
+			&i.HealthStatus,
+			&i.HealthScore,
+			&i.AgentVersion,
+			&i.RuntimeVersion,
 		); err != nil {
 			return nil, err
 		}

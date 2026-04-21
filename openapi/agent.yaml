@@ -1,19 +1,29 @@
 openapi: 3.1.0
 info:
   title: HugeEdge Agent API
-  version: 0.1.0
+  version: 0.2.0
 paths:
   /v1/agent/register:
     post:
       operationId: registerAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
       responses:
         "201":
           description: Registered agent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
   /v1/agent/renew:
     post:
       operationId: renewAgent
       responses:
-        "200":
+        "202":
           description: Renewed agent lease
   /v1/agent/heartbeat:
     post:
@@ -27,3 +37,106 @@ paths:
       responses:
         "202":
           description: Capabilities accepted
+  /v1/agent/config/next:
+    post:
+      operationId: nextConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NextConfigRequest"
+      responses:
+        "200":
+          description: Desired config bundle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigBundle"
+        "204":
+          description: No config change pending
+  /v1/agent/config/report:
+    post:
+      operationId: reportConfigResult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigReportRequest"
+      responses:
+        "202":
+          description: Config apply result accepted
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [bootstrapToken]
+      properties:
+        bootstrapToken:
+          type: string
+    RegisterResponse:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+    NextConfigRequest:
+      type: object
+      required: [nodeId, currentConfigVersion, agentVersion, runtimeVersion]
+      properties:
+        nodeId:
+          type: string
+        currentConfigVersion:
+          type: integer
+        agentVersion:
+          type: string
+        runtimeVersion:
+          type: string
+    ConfigBundle:
+      type: object
+      required: [bundleVersion, adapterName, config, hash, issuedAt]
+      properties:
+        bundleVersion:
+          type: integer
+        adapterName:
+          type: string
+          const: xray-adapter
+        config:
+          type: object
+          additionalProperties: true
+        hash:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+    ConfigReportRequest:
+      type: object
+      required:
+        - nodeId
+        - bundleVersion
+        - status
+        - message
+        - healthStatus
+        - healthScore
+        - agentVersion
+        - runtimeVersion
+      properties:
+        nodeId:
+          type: string
+        bundleVersion:
+          type: integer
+        status:
+          type: string
+          enum: [in_progress, succeeded, failed, rolled_back]
+        message:
+          type: string
+        healthStatus:
+          type: string
+          enum: [online, degraded, offline]
+        healthScore:
+          type: integer
+        agentVersion:
+          type: string
+        runtimeVersion:
+          type: string

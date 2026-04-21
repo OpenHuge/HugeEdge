@@ -13,4 +13,9 @@ type Adapter interface {
 	Name() string
 	CompatibilityTarget() string
 	Discover(ctx context.Context) ([]Capability, error)
+	Validate(config []byte) error
+	Apply(config []byte) error
+	Rollback() error
+	HealthCheck(ctx context.Context) error
+	Version() string
 }

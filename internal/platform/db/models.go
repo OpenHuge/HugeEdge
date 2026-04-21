@@ -26,6 +26,18 @@ type BootstrapToken struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type ConfigBundle struct {
+	ID            pgtype.UUID
+	TenantID      pgtype.UUID
+	NodeID        pgtype.UUID
+	AdapterName   string
+	BundleVersion int32
+	Config        []byte
+	Hash          string
+	CreatedBy     pgtype.UUID
+	CreatedAt     pgtype.Timestamptz
+}
+
 type EbpfProbeProfile struct {
 	ID            pgtype.UUID
 	Name          string
@@ -51,6 +63,10 @@ type Node struct {
 	AdapterName     string
 	LastHeartbeatAt pgtype.Timestamptz
 	CreatedAt       pgtype.Timestamptz
+	AgentVersion    string
+	RuntimeVersion  string
+	HealthStatus    string
+	HealthScore     int32
 }
 
 type NodeCapability struct {
@@ -60,6 +76,31 @@ type NodeCapability struct {
 	Version   string
 	Manifest  []byte
 	CreatedAt pgtype.Timestamptz
+}
+
+type NodeConfigApply struct {
+	ID             pgtype.UUID
+	NodeID         pgtype.UUID
+	RolloutID      pgtype.UUID
+	BundleID       pgtype.UUID
+	Status         string
+	Message        string
+	HealthStatus   string
+	HealthScore    int32
+	AgentVersion   string
+	RuntimeVersion string
+	StartedAt      pgtype.Timestamptz
+	FinishedAt     pgtype.Timestamptz
+}
+
+type NodeConfigState struct {
+	NodeID                pgtype.UUID
+	CurrentBundleID       pgtype.UUID
+	DesiredBundleID       pgtype.UUID
+	LastApplyStatus       pgtype.Text
+	LastApplyMessage      pgtype.Text
+	LastApplyAt           pgtype.Timestamptz
+	LastKnownGoodBundleID pgtype.UUID
 }
 
 type NodeWasmPluginInstall struct {
@@ -141,6 +182,21 @@ type Role struct {
 	Name        string
 	Permissions []byte
 	CreatedAt   pgtype.Timestamptz
+}
+
+type Rollout struct {
+	ID                  pgtype.UUID
+	TenantID            pgtype.UUID
+	NodeID              pgtype.UUID
+	BundleID            pgtype.UUID
+	PreviousBundleID    pgtype.UUID
+	AdapterName         string
+	Status              string
+	Note                string
+	CreatedBy           pgtype.UUID
+	RollbackOfRolloutID pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+	CompletedAt         pgtype.Timestamptz
 }
 
 type Tenant struct {

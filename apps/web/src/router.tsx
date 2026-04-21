@@ -1,4 +1,4 @@
-import type { BootstrapToken } from "@hugeedge/api-client";
+import type { BootstrapToken, Rollout } from "@hugeedge/api-client";
 import {
   DataTable,
   ErrorState,
@@ -13,15 +13,23 @@ import {
   Container,
   CopyButton,
   Group,
+  MantineProvider,
   Modal,
   PasswordInput,
   Stack,
   Text,
+  Textarea,
   TextInput,
   Title,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   createRootRoute,
   createRoute,
@@ -37,8 +45,10 @@ import { api, tokenStore } from "./lib/api";
 import { Activity, Gauge } from "./nav";
 
 const rootRoute = createRootRoute({
-  component: () => <Outlet />,
+  component: RootProviders,
 });
+
+const queryClient = new QueryClient();
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -113,6 +123,12 @@ const auditRoute = createRoute({
   component: AuditPage,
 });
 
+const rolloutsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/ops/rollouts",
+  component: RolloutsPage,
+});
+
 const systemRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: "/system",
@@ -126,6 +142,7 @@ const routeTree = rootRoute.addChildren([
     overviewRoute,
     tenantsRoute,
     nodesRoute,
+    rolloutsRoute,
     auditRoute,
     systemRoute,
   ]),
@@ -141,6 +158,16 @@ declare module "@tanstack/react-router" {
   interface Register {
     router: typeof router;
   }
+}
+
+function RootProviders() {
+  return (
+    <MantineProvider defaultColorScheme="light">
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+      </QueryClientProvider>
+    </MantineProvider>
+  );
 }
 
 function LoginPage() {
@@ -308,14 +335,38 @@ function TenantsPage() {
 function NodesPage() {
   const queryClient = useQueryClient();
   const [token, setToken] = useState<BootstrapToken | null>(null);
-  const [opened, { open, close }] = useDisclosure(false);
+  const [bootstrapOpened, bootstrapDisclosure] = useDisclosure(false);
+  const [rolloutOpened, rolloutDisclosure] = useDisclosure(false);
+  const [selectedNodeId, setSelectedNodeId] = useState("");
+  const [note, setNote] = useState("");
+  const [configText, setConfigText] = useState('{\n  "mode": "baseline"\n}');
   const query = useQuery({ queryKey: ["nodes"], queryFn: () => api.nodes() });
   const createToken = useMutation({
     mutationFn: () => api.createBootstrapToken(),
     onSuccess: async (result) => {
       setToken(result);
-      open();
+      bootstrapDisclosure.open();
       await queryClient.invalidateQueries({ queryKey: ["audit"] });
+    },
+  });
+  const createRollout = useMutation({
+    mutationFn: async () => {
+      const config = JSON.parse(configText) as Record<string, unknown>;
+      return api.createRollout({
+        nodeId: selectedNodeId,
+        adapterName: "xray-adapter",
+        config,
+        note,
+      });
+    },
+    onSuccess: async () => {
+      setNote("");
+      rolloutDisclosure.close();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["nodes"] }),
+        queryClient.invalidateQueries({ queryKey: ["rollouts"] }),
+        queryClient.invalidateQueries({ queryKey: ["audit"] }),
+      ]);
     },
   });
   if (query.isLoading) return <LoadingState />;
@@ -349,18 +400,58 @@ function NodesPage() {
             label: "Status",
             render: (row) => <StatusBadge status={String(row.status)} />,
           },
+          {
+            key: "healthStatus",
+            label: "Health",
+            render: (row) => <StatusBadge status={String(row.healthStatus)} />,
+          },
           { key: "adapterName", label: "Adapter" },
+          {
+            key: "currentConfigVersion",
+            label: "Current Config",
+            render: (row) => String(row.currentConfigVersion ?? ""),
+          },
+          {
+            key: "desiredConfigVersion",
+            label: "Desired Config",
+            render: (row) => String(row.desiredConfigVersion ?? ""),
+          },
+          { key: "agentVersion", label: "Agent" },
+          { key: "runtimeVersion", label: "Runtime" },
+          {
+            key: "lastApplyStatus",
+            label: "Last Apply",
+            render: (row) => String(row.lastApplyStatus ?? ""),
+          },
           {
             key: "lastHeartbeatAt",
             label: "Last Heartbeat",
             render: (row) => formatDate(row.lastHeartbeatAt),
           },
+          {
+            key: "id",
+            label: "Actions",
+            render: (row) => (
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => {
+                  setSelectedNodeId(String(row.id));
+                  setConfigText('{\n  "mode": "baseline"\n}');
+                  setNote("");
+                  rolloutDisclosure.open();
+                }}
+              >
+                Deploy Config
+              </Button>
+            ),
+          },
           { key: "createdAt", label: "Created" },
         ]}
       />
       <Modal
-        opened={opened}
-        onClose={close}
+        opened={bootstrapOpened}
+        onClose={bootstrapDisclosure.close}
         title="Bootstrap Token"
         centered
         size="lg"
@@ -381,6 +472,159 @@ function NodesPage() {
             </CopyButton>
           </Group>
         </Stack>
+      </Modal>
+      <Modal
+        opened={rolloutOpened}
+        onClose={rolloutDisclosure.close}
+        title="Deploy Config"
+        centered
+        size="lg"
+      >
+        <Stack
+          component="form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            createRollout.mutate();
+          }}
+        >
+          <TextInput label="Node" value={selectedNodeId} readOnly />
+          <TextInput
+            label="Note"
+            value={note}
+            onChange={(event) => setNote(event.currentTarget.value)}
+          />
+          <Textarea
+            label="Config JSON"
+            minRows={10}
+            value={configText}
+            onChange={(event) => setConfigText(event.currentTarget.value)}
+          />
+          {createRollout.error ? (
+            <Alert color="red" variant="light">
+              {createRollout.error.message}
+            </Alert>
+          ) : null}
+          <Group justify="flex-end">
+            <Button variant="subtle" onClick={rolloutDisclosure.close}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={createRollout.isPending}>
+              Create Rollout
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </Stack>
+  );
+}
+
+function RolloutsPage() {
+  const queryClient = useQueryClient();
+  const [selectedRolloutId, setSelectedRolloutId] = useState<string | null>(
+    null,
+  );
+  const [opened, disclosure] = useDisclosure(false);
+  const query = useQuery({
+    queryKey: ["rollouts"],
+    queryFn: () => api.rollouts(),
+  });
+  const detail = useQuery({
+    queryKey: ["rollouts", selectedRolloutId],
+    queryFn: () => api.rollout(String(selectedRolloutId)),
+    enabled: Boolean(selectedRolloutId),
+  });
+  const rollback = useMutation({
+    mutationFn: (rolloutId: string) => api.rollbackRollout(rolloutId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["rollouts"] }),
+        queryClient.invalidateQueries({ queryKey: ["nodes"] }),
+        queryClient.invalidateQueries({ queryKey: ["audit"] }),
+      ]);
+    },
+  });
+
+  if (query.isLoading) return <LoadingState />;
+  if (query.error) return <ErrorState message={query.error.message} />;
+
+  return (
+    <Stack>
+      <Title order={2}>Rollouts</Title>
+      <DataTable
+        rows={query.data ?? []}
+        columns={[
+          { key: "nodeName", label: "Node" },
+          { key: "bundleVersion", label: "Bundle" },
+          {
+            key: "status",
+            label: "Status",
+            render: (row) => <StatusBadge status={String(row.status)} />,
+          },
+          {
+            key: "lastApplyStatus",
+            label: "Last Apply",
+            render: (row) => String(row.lastApplyStatus ?? ""),
+          },
+          {
+            key: "healthStatus",
+            label: "Health",
+            render: (row) =>
+              row.healthStatus ? (
+                <StatusBadge status={String(row.healthStatus)} />
+              ) : (
+                ""
+              ),
+          },
+          {
+            key: "createdAt",
+            label: "Created",
+            render: (row) => formatDate(row.createdAt),
+          },
+          {
+            key: "completedAt",
+            label: "Completed",
+            render: (row) => formatDate(row.completedAt),
+          },
+          {
+            key: "id",
+            label: "Actions",
+            render: (row) => (
+              <Group gap="xs">
+                <Button
+                  size="xs"
+                  variant="light"
+                  onClick={() => {
+                    setSelectedRolloutId(String(row.id));
+                    disclosure.open();
+                  }}
+                >
+                  Inspect
+                </Button>
+                {row.status === "succeeded" ? (
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    loading={rollback.isPending}
+                    onClick={() => rollback.mutate(String(row.id))}
+                  >
+                    Rollback
+                  </Button>
+                ) : null}
+              </Group>
+            ),
+          },
+        ]}
+      />
+      <Modal
+        opened={opened}
+        onClose={disclosure.close}
+        title="Rollout Detail"
+        centered
+        size="lg"
+      >
+        {detail.isLoading ? <LoadingState /> : null}
+        {detail.error ? <ErrorState message={detail.error.message} /> : null}
+        {detail.data ? <RolloutDetail rollout={detail.data} /> : null}
       </Modal>
     </Stack>
   );
@@ -464,6 +708,42 @@ function SystemPage() {
           { key: "providerId", label: "Provider" },
         ]}
       />
+    </Stack>
+  );
+}
+
+function RolloutDetail({ rollout }: { rollout: Rollout }) {
+  return (
+    <Stack>
+      <TextInput label="Node" value={rollout.nodeName} readOnly />
+      <TextInput
+        label="Bundle Version"
+        value={String(rollout.bundleVersion)}
+        readOnly
+      />
+      <TextInput label="Status" value={rollout.status} readOnly />
+      <TextInput
+        label="Last Apply"
+        value={rollout.lastApplyStatus ?? ""}
+        readOnly
+      />
+      <TextInput
+        label="Message"
+        value={rollout.lastApplyMessage ?? ""}
+        readOnly
+      />
+      <TextInput label="Health" value={rollout.healthStatus ?? ""} readOnly />
+      <TextInput
+        label="Created"
+        value={formatDate(rollout.createdAt)}
+        readOnly
+      />
+      <TextInput
+        label="Completed"
+        value={formatDate(rollout.completedAt)}
+        readOnly
+      />
+      <Code block>{JSON.stringify(rollout.config ?? {}, null, 2)}</Code>
     </Stack>
   );
 }
