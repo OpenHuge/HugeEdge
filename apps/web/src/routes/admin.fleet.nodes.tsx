@@ -31,6 +31,15 @@ import {
 import { queryClient } from "../lib/query-client";
 import { queryKeys } from "../lib/session";
 
+type NodeRow = Awaited<ReturnType<typeof api.nodes>>[number] & {
+  healthStatus: string;
+  currentConfigVersion: string;
+  desiredConfigVersion: string;
+  agentVersion: string;
+  runtimeVersion: string;
+  lastApplyStatus: string;
+};
+
 type NodeSort = "name" | "status" | "adapterName" | "createdAt";
 
 const nodesSearchSchema = z.object({
@@ -72,26 +81,6 @@ function NodesPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.audit });
     },
   });
-  const createRollout = useMutation({
-    mutationFn: async () => {
-      const config = JSON.parse(configText) as Record<string, unknown>;
-      return api.createRollout({
-        nodeId: selectedNodeId,
-        adapterName: "xray-adapter",
-        config,
-        note,
-      });
-    },
-    onSuccess: async () => {
-      setNote("");
-      rolloutDisclosure.close();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodes }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.rollouts }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.audit }),
-      ]);
-    },
-  });
 
   if (query.isLoading) {
     return <LoadingState />;
@@ -110,7 +99,16 @@ function NodesPage() {
     );
   }
 
-  const rows = (query.data ?? [])
+  const rows: NodeRow[] = (query.data ?? [])
+    .map((node) => ({
+      ...node,
+      healthStatus: node.status === "ready" ? "online" : "registered",
+      currentConfigVersion: "pending Track A",
+      desiredConfigVersion: "pending Track A",
+      agentVersion: "pending Track A",
+      runtimeVersion: "pending Track A",
+      lastApplyStatus: "pending Track A",
+    }))
     .filter((node) => {
       const statusMatches =
         search.status === "all" ? true : node.status === search.status;
@@ -324,13 +322,7 @@ function NodesPage() {
         centered
         size="lg"
       >
-        <Stack
-          component="form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            createRollout.mutate();
-          }}
-        >
+        <Stack>
           <TextInput label="Node" value={selectedNodeId} readOnly />
           <TextInput
             label="Note"
@@ -343,18 +335,15 @@ function NodesPage() {
             value={configText}
             onChange={(event) => setConfigText(event.currentTarget.value)}
           />
-          {createRollout.error ? (
-            <Alert color="red" variant="light">
-              {createRollout.error instanceof Error
-                ? createRollout.error.message
-                : "Unable to create rollout"}
-            </Alert>
-          ) : null}
+          <Alert color="blue" variant="light">
+            Rollout creation is temporarily disabled in the front end until the
+            published API client catches up with admin rollout mutations.
+          </Alert>
           <Group justify="flex-end">
             <Button variant="subtle" onClick={rolloutDisclosure.close}>
               Cancel
             </Button>
-            <Button type="submit" loading={createRollout.isPending}>
+            <Button disabled>
               Create Rollout
             </Button>
           </Group>
