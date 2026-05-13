@@ -15,3 +15,26 @@ paths:
       responses:
         "200":
           description: API dependency readiness
+  /v1/sub/{token}:
+    get:
+      operationId: getSubscriptionFeed
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Subscription feed payload
+    head:
+      operationId: headSubscriptionFeed
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Subscription feed metadata

@@ -49,6 +49,104 @@ func TestAppDatabaseBackedControlPlaneFlow(t *testing.T) {
 	if me["email"] != "admin@example.com" {
 		t.Fatalf("unexpected /me response: %#v", me)
 	}
+	if me["accountId"] == "" || me["billingScope"] == "" {
+		t.Fatalf("expected account-scoped /me response: %#v", me)
+	}
+
+	var accounts []Account
+	doJSON(t, server.URL, http.MethodGet, "/v1/admin/accounts", tokens.AccessToken, nil, http.StatusOK, &accounts)
+	if len(accounts) != 1 || accounts[0].Type != "individual" {
+		t.Fatalf("expected one bootstrapped individual account, got %#v", accounts)
+	}
+
+	var createdAccount Account
+	doJSON(t, server.URL, http.MethodPost, "/v1/admin/accounts", tokens.AccessToken, map[string]string{
+		"type":         "organization",
+		"name":         "Northwind",
+		"billingEmail": "billing@northwind.example",
+	}, http.StatusCreated, &createdAccount)
+	if createdAccount.ID == "" || createdAccount.DefaultTenantID == "" {
+		t.Fatalf("unexpected created account: %#v", createdAccount)
+	}
+
+	doJSON(t, server.URL, http.MethodPatch, "/v1/admin/accounts", tokens.AccessToken, map[string]any{
+		"id":     createdAccount.ID,
+		"status": "suspended",
+	}, http.StatusOK, &createdAccount)
+	if createdAccount.Status != "suspended" {
+		t.Fatalf("expected suspended account after patch, got %#v", createdAccount)
+	}
+
+	var overview BillingOverview
+	doJSON(t, server.URL, http.MethodGet, "/v1/app/billing/overview", tokens.AccessToken, nil, http.StatusOK, &overview)
+	if overview.Account.ID == "" || overview.ActiveSubscription == nil {
+		t.Fatalf("unexpected billing overview: %#v", overview)
+	}
+	if overview.ActiveSubscription.Status != "trialing" {
+		t.Fatalf("expected bootstrapped trial subscription, got %#v", overview.ActiveSubscription)
+	}
+	if overview.AvailableProductCount < 3 {
+		t.Fatalf("expected seeded catalog products, got %#v", overview)
+	}
+
+	var products []CatalogProduct
+	doJSON(t, server.URL, http.MethodGet, "/v1/app/catalog/products", tokens.AccessToken, nil, http.StatusOK, &products)
+	if len(products) < 3 || len(products[0].SKUs) == 0 {
+		t.Fatalf("expected seeded catalog products with skus, got %#v", products)
+	}
+
+	var subscriptions []Subscription
+	doJSON(t, server.URL, http.MethodGet, "/v1/app/subscriptions", tokens.AccessToken, nil, http.StatusOK, &subscriptions)
+	if len(subscriptions) != 1 {
+		t.Fatalf("expected one bootstrapped subscription, got %#v", subscriptions)
+	}
+
+	var subscription Subscription
+	doJSON(t, server.URL, http.MethodGet, "/v1/app/subscriptions/"+subscriptions[0].ID, tokens.AccessToken, nil, http.StatusOK, &subscription)
+	if subscription.ID != subscriptions[0].ID || subscription.FeedCount != 1 {
+		t.Fatalf("unexpected subscription detail: %#v", subscription)
+	}
+
+	var orders []Order
+	doJSON(t, server.URL, http.MethodGet, "/v1/app/orders", tokens.AccessToken, nil, http.StatusOK, &orders)
+	if len(orders) != 1 {
+		t.Fatalf("expected one bootstrapped order, got %#v", orders)
+	}
+
+	var order Order
+	doJSON(t, server.URL, http.MethodGet, "/v1/app/orders/"+orders[0].ID, tokens.AccessToken, nil, http.StatusOK, &order)
+	if order.ID != orders[0].ID {
+		t.Fatalf("unexpected order detail: %#v", order)
+	}
+
+	var feeds []SubscriptionFeed
+	doJSON(t, server.URL, http.MethodGet, "/v1/app/subscription-feeds", tokens.AccessToken, nil, http.StatusOK, &feeds)
+	if len(feeds) != 1 || feeds[0].Token == "" || feeds[0].AccessURL == "" {
+		t.Fatalf("expected a readable subscription feed, got %#v", feeds)
+	}
+
+	feedResp := doRequest(t, server.URL, http.MethodGet, "/v1/sub/"+feeds[0].Token, "", nil)
+	defer feedResp.Body.Close()
+	if feedResp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected feed status: %d", feedResp.StatusCode)
+	}
+	if feedResp.Header.Get("X-HE-Plan") == "" {
+		t.Fatalf("expected feed metadata headers, got %#v", feedResp.Header)
+	}
+	var delivery FeedDelivery
+	decodeResponseJSON(t, feedResp, &delivery)
+	if delivery.FeedID != feeds[0].ID || delivery.Plan == "" {
+		t.Fatalf("unexpected feed delivery payload: %#v", delivery)
+	}
+
+	feedHead := doRequest(t, server.URL, http.MethodHead, "/v1/sub/"+feeds[0].Token, "", nil)
+	defer feedHead.Body.Close()
+	if feedHead.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected feed HEAD status: %d", feedHead.StatusCode)
+	}
+	if feedHead.Header.Get("X-HE-ETag") == "" {
+		t.Fatalf("expected feed HEAD etag metadata, got %#v", feedHead.Header)
+	}
 
 	var tenant Tenant
 	doJSON(t, server.URL, http.MethodPost, "/v1/admin/tenants", tokens.AccessToken, map[string]string{
@@ -259,7 +357,7 @@ func TestAppDatabaseBackedControlPlaneFlow(t *testing.T) {
 	for _, entry := range audit {
 		seen[entry.Action] = entry
 	}
-	for _, action := range []string{"auth.login", "tenant.create", "node.bootstrap_token.create"} {
+	for _, action := range []string{"auth.login", "account.create", "account.update", "tenant.create", "node.bootstrap_token.create"} {
 		if _, ok := seen[action]; !ok {
 			t.Fatalf("missing audit action %q in %#v", action, audit)
 		}
@@ -309,6 +407,22 @@ func resetTestDatabase(t *testing.T, ctx context.Context, databaseURL string) {
 func doJSON(t *testing.T, baseURL string, method string, path string, accessToken string, body any, wantStatus int, out any) {
 	t.Helper()
 
+	resp := doRequest(t, baseURL, method, path, accessToken, body)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != wantStatus {
+		var errorBody map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&errorBody)
+		t.Fatalf("%s %s status = %d, want %d, body %#v", method, path, resp.StatusCode, wantStatus, errorBody)
+	}
+	if out != nil {
+		decodeResponseJSON(t, resp, out)
+	}
+}
+
+func doRequest(t *testing.T, baseURL string, method string, path string, accessToken string, body any) *http.Response {
+	t.Helper()
+
 	var payload bytes.Buffer
 	if body != nil {
 		if err := json.NewEncoder(&payload).Encode(body); err != nil {
@@ -331,16 +445,15 @@ func doJSON(t *testing.T, baseURL string, method string, path string, accessToke
 	if err != nil {
 		t.Fatalf("%s %s failed: %v", method, path, err)
 	}
-	defer resp.Body.Close()
+	return resp
+}
 
-	if resp.StatusCode != wantStatus {
-		var errorBody map[string]any
-		_ = json.NewDecoder(resp.Body).Decode(&errorBody)
-		t.Fatalf("%s %s status = %d, want %d, body %#v", method, path, resp.StatusCode, wantStatus, errorBody)
+func decodeResponseJSON(t *testing.T, resp *http.Response, out any) {
+	t.Helper()
+	if out == nil || resp.StatusCode == http.StatusNoContent {
+		return
 	}
-	if out != nil {
-		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-			t.Fatalf("decode response body: %v", err)
-		}
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		t.Fatalf("decode response body: %v", err)
 	}
 }

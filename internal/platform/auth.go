@@ -13,10 +13,13 @@ type AuthTokens struct {
 }
 
 type HugeEdgeClaims struct {
-	TenantID  string   `json:"tenant_id"`
-	RoleIDs   []string `json:"role_ids"`
-	SessionID string   `json:"session_id"`
-	TokenType string   `json:"token_type"`
+	AccountID      string   `json:"account_id"`
+	AccountRoleIDs []string `json:"account_role_ids"`
+	BillingScope   string   `json:"billing_scope"`
+	TenantID       string   `json:"tenant_id"`
+	RoleIDs        []string `json:"role_ids"`
+	SessionID      string   `json:"session_id"`
+	TokenType      string   `json:"token_type"`
 	jwt.RegisteredClaims
 }
 
