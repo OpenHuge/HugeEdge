@@ -10,18 +10,38 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppWalletRouteImport } from './routes/app.wallet'
+import { Route as AppSubscriptionRouteImport } from './routes/app.subscription'
+import { Route as AppStoreRouteImport } from './routes/app.store'
+import { Route as AppOrdersRouteImport } from './routes/app.orders'
+import { Route as AppMembersRouteImport } from './routes/app.members'
+import { Route as AppInvoicesRouteImport } from './routes/app.invoices'
+import { Route as AppFeedsRouteImport } from './routes/app.feeds'
 import { Route as AdminTenantsRouteImport } from './routes/admin.tenants'
 import { Route as AdminSystemRouteImport } from './routes/admin.system'
 import { Route as AdminOverviewRouteImport } from './routes/admin.overview'
 import { Route as AdminOpsRolloutsRouteImport } from './routes/admin.ops.rollouts'
 import { Route as AdminOpsAuditRouteImport } from './routes/admin.ops.audit'
 import { Route as AdminFleetNodesRouteImport } from './routes/admin.fleet.nodes'
+import { Route as AdminBillingSubscriptionsRouteImport } from './routes/admin.billing.subscriptions'
+import { Route as AdminBillingResellersRouteImport } from './routes/admin.billing.resellers'
+import { Route as AdminBillingProductsRouteImport } from './routes/admin.billing.products'
+import { Route as AdminBillingOverviewRouteImport } from './routes/admin.billing.overview'
+import { Route as AdminBillingOrdersRouteImport } from './routes/admin.billing.orders'
+import { Route as AdminBillingInvoicesRouteImport } from './routes/admin.billing.invoices'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -33,6 +53,46 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppWalletRoute = AppWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSubscriptionRoute = AppSubscriptionRouteImport.update({
+  id: '/subscription',
+  path: '/subscription',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStoreRoute = AppStoreRouteImport.update({
+  id: '/store',
+  path: '/store',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrdersRoute = AppOrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMembersRoute = AppMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvoicesRoute = AppInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFeedsRoute = AppFeedsRouteImport.update({
+  id: '/feeds',
+  path: '/feeds',
+  getParentRoute: () => AppRoute,
 } as any)
 const AdminTenantsRoute = AdminTenantsRouteImport.update({
   id: '/tenants',
@@ -64,14 +124,60 @@ const AdminFleetNodesRoute = AdminFleetNodesRouteImport.update({
   path: '/fleet/nodes',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBillingSubscriptionsRoute =
+  AdminBillingSubscriptionsRouteImport.update({
+    id: '/billing/subscriptions',
+    path: '/billing/subscriptions',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminBillingResellersRoute = AdminBillingResellersRouteImport.update({
+  id: '/billing/resellers',
+  path: '/billing/resellers',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBillingProductsRoute = AdminBillingProductsRouteImport.update({
+  id: '/billing/products',
+  path: '/billing/products',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBillingOverviewRoute = AdminBillingOverviewRouteImport.update({
+  id: '/billing/overview',
+  path: '/billing/overview',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBillingOrdersRoute = AdminBillingOrdersRouteImport.update({
+  id: '/billing/orders',
+  path: '/billing/orders',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBillingInvoicesRoute = AdminBillingInvoicesRouteImport.update({
+  id: '/billing/invoices',
+  path: '/billing/invoices',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/system': typeof AdminSystemRoute
   '/admin/tenants': typeof AdminTenantsRoute
+  '/app/feeds': typeof AppFeedsRoute
+  '/app/invoices': typeof AppInvoicesRoute
+  '/app/members': typeof AppMembersRoute
+  '/app/orders': typeof AppOrdersRoute
+  '/app/store': typeof AppStoreRoute
+  '/app/subscription': typeof AppSubscriptionRoute
+  '/app/wallet': typeof AppWalletRoute
+  '/app/': typeof AppIndexRoute
+  '/admin/billing/invoices': typeof AdminBillingInvoicesRoute
+  '/admin/billing/orders': typeof AdminBillingOrdersRoute
+  '/admin/billing/overview': typeof AdminBillingOverviewRoute
+  '/admin/billing/products': typeof AdminBillingProductsRoute
+  '/admin/billing/resellers': typeof AdminBillingResellersRoute
+  '/admin/billing/subscriptions': typeof AdminBillingSubscriptionsRoute
   '/admin/fleet/nodes': typeof AdminFleetNodesRoute
   '/admin/ops/audit': typeof AdminOpsAuditRoute
   '/admin/ops/rollouts': typeof AdminOpsRolloutsRoute
@@ -83,6 +189,20 @@ export interface FileRoutesByTo {
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/system': typeof AdminSystemRoute
   '/admin/tenants': typeof AdminTenantsRoute
+  '/app/feeds': typeof AppFeedsRoute
+  '/app/invoices': typeof AppInvoicesRoute
+  '/app/members': typeof AppMembersRoute
+  '/app/orders': typeof AppOrdersRoute
+  '/app/store': typeof AppStoreRoute
+  '/app/subscription': typeof AppSubscriptionRoute
+  '/app/wallet': typeof AppWalletRoute
+  '/app': typeof AppIndexRoute
+  '/admin/billing/invoices': typeof AdminBillingInvoicesRoute
+  '/admin/billing/orders': typeof AdminBillingOrdersRoute
+  '/admin/billing/overview': typeof AdminBillingOverviewRoute
+  '/admin/billing/products': typeof AdminBillingProductsRoute
+  '/admin/billing/resellers': typeof AdminBillingResellersRoute
+  '/admin/billing/subscriptions': typeof AdminBillingSubscriptionsRoute
   '/admin/fleet/nodes': typeof AdminFleetNodesRoute
   '/admin/ops/audit': typeof AdminOpsAuditRoute
   '/admin/ops/rollouts': typeof AdminOpsRolloutsRoute
@@ -91,10 +211,25 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/system': typeof AdminSystemRoute
   '/admin/tenants': typeof AdminTenantsRoute
+  '/app/feeds': typeof AppFeedsRoute
+  '/app/invoices': typeof AppInvoicesRoute
+  '/app/members': typeof AppMembersRoute
+  '/app/orders': typeof AppOrdersRoute
+  '/app/store': typeof AppStoreRoute
+  '/app/subscription': typeof AppSubscriptionRoute
+  '/app/wallet': typeof AppWalletRoute
+  '/app/': typeof AppIndexRoute
+  '/admin/billing/invoices': typeof AdminBillingInvoicesRoute
+  '/admin/billing/orders': typeof AdminBillingOrdersRoute
+  '/admin/billing/overview': typeof AdminBillingOverviewRoute
+  '/admin/billing/products': typeof AdminBillingProductsRoute
+  '/admin/billing/resellers': typeof AdminBillingResellersRoute
+  '/admin/billing/subscriptions': typeof AdminBillingSubscriptionsRoute
   '/admin/fleet/nodes': typeof AdminFleetNodesRoute
   '/admin/ops/audit': typeof AdminOpsAuditRoute
   '/admin/ops/rollouts': typeof AdminOpsRolloutsRoute
@@ -104,10 +239,25 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/app'
     | '/login'
     | '/admin/overview'
     | '/admin/system'
     | '/admin/tenants'
+    | '/app/feeds'
+    | '/app/invoices'
+    | '/app/members'
+    | '/app/orders'
+    | '/app/store'
+    | '/app/subscription'
+    | '/app/wallet'
+    | '/app/'
+    | '/admin/billing/invoices'
+    | '/admin/billing/orders'
+    | '/admin/billing/overview'
+    | '/admin/billing/products'
+    | '/admin/billing/resellers'
+    | '/admin/billing/subscriptions'
     | '/admin/fleet/nodes'
     | '/admin/ops/audit'
     | '/admin/ops/rollouts'
@@ -119,6 +269,20 @@ export interface FileRouteTypes {
     | '/admin/overview'
     | '/admin/system'
     | '/admin/tenants'
+    | '/app/feeds'
+    | '/app/invoices'
+    | '/app/members'
+    | '/app/orders'
+    | '/app/store'
+    | '/app/subscription'
+    | '/app/wallet'
+    | '/app'
+    | '/admin/billing/invoices'
+    | '/admin/billing/orders'
+    | '/admin/billing/overview'
+    | '/admin/billing/products'
+    | '/admin/billing/resellers'
+    | '/admin/billing/subscriptions'
     | '/admin/fleet/nodes'
     | '/admin/ops/audit'
     | '/admin/ops/rollouts'
@@ -126,10 +290,25 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/app'
     | '/login'
     | '/admin/overview'
     | '/admin/system'
     | '/admin/tenants'
+    | '/app/feeds'
+    | '/app/invoices'
+    | '/app/members'
+    | '/app/orders'
+    | '/app/store'
+    | '/app/subscription'
+    | '/app/wallet'
+    | '/app/'
+    | '/admin/billing/invoices'
+    | '/admin/billing/orders'
+    | '/admin/billing/overview'
+    | '/admin/billing/products'
+    | '/admin/billing/resellers'
+    | '/admin/billing/subscriptions'
     | '/admin/fleet/nodes'
     | '/admin/ops/audit'
     | '/admin/ops/rollouts'
@@ -138,6 +317,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
 }
 
@@ -148,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -163,6 +350,62 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/wallet': {
+      id: '/app/wallet'
+      path: '/wallet'
+      fullPath: '/app/wallet'
+      preLoaderRoute: typeof AppWalletRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/subscription': {
+      id: '/app/subscription'
+      path: '/subscription'
+      fullPath: '/app/subscription'
+      preLoaderRoute: typeof AppSubscriptionRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/store': {
+      id: '/app/store'
+      path: '/store'
+      fullPath: '/app/store'
+      preLoaderRoute: typeof AppStoreRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/orders': {
+      id: '/app/orders'
+      path: '/orders'
+      fullPath: '/app/orders'
+      preLoaderRoute: typeof AppOrdersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/members': {
+      id: '/app/members'
+      path: '/members'
+      fullPath: '/app/members'
+      preLoaderRoute: typeof AppMembersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/invoices': {
+      id: '/app/invoices'
+      path: '/invoices'
+      fullPath: '/app/invoices'
+      preLoaderRoute: typeof AppInvoicesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/feeds': {
+      id: '/app/feeds'
+      path: '/feeds'
+      fullPath: '/app/feeds'
+      preLoaderRoute: typeof AppFeedsRouteImport
+      parentRoute: typeof AppRoute
     }
     '/admin/tenants': {
       id: '/admin/tenants'
@@ -206,6 +449,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFleetNodesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/billing/subscriptions': {
+      id: '/admin/billing/subscriptions'
+      path: '/billing/subscriptions'
+      fullPath: '/admin/billing/subscriptions'
+      preLoaderRoute: typeof AdminBillingSubscriptionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/billing/resellers': {
+      id: '/admin/billing/resellers'
+      path: '/billing/resellers'
+      fullPath: '/admin/billing/resellers'
+      preLoaderRoute: typeof AdminBillingResellersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/billing/products': {
+      id: '/admin/billing/products'
+      path: '/billing/products'
+      fullPath: '/admin/billing/products'
+      preLoaderRoute: typeof AdminBillingProductsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/billing/overview': {
+      id: '/admin/billing/overview'
+      path: '/billing/overview'
+      fullPath: '/admin/billing/overview'
+      preLoaderRoute: typeof AdminBillingOverviewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/billing/orders': {
+      id: '/admin/billing/orders'
+      path: '/billing/orders'
+      fullPath: '/admin/billing/orders'
+      preLoaderRoute: typeof AdminBillingOrdersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/billing/invoices': {
+      id: '/admin/billing/invoices'
+      path: '/billing/invoices'
+      fullPath: '/admin/billing/invoices'
+      preLoaderRoute: typeof AdminBillingInvoicesRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
@@ -213,6 +498,12 @@ interface AdminRouteChildren {
   AdminOverviewRoute: typeof AdminOverviewRoute
   AdminSystemRoute: typeof AdminSystemRoute
   AdminTenantsRoute: typeof AdminTenantsRoute
+  AdminBillingInvoicesRoute: typeof AdminBillingInvoicesRoute
+  AdminBillingOrdersRoute: typeof AdminBillingOrdersRoute
+  AdminBillingOverviewRoute: typeof AdminBillingOverviewRoute
+  AdminBillingProductsRoute: typeof AdminBillingProductsRoute
+  AdminBillingResellersRoute: typeof AdminBillingResellersRoute
+  AdminBillingSubscriptionsRoute: typeof AdminBillingSubscriptionsRoute
   AdminFleetNodesRoute: typeof AdminFleetNodesRoute
   AdminOpsAuditRoute: typeof AdminOpsAuditRoute
   AdminOpsRolloutsRoute: typeof AdminOpsRolloutsRoute
@@ -222,6 +513,12 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminOverviewRoute: AdminOverviewRoute,
   AdminSystemRoute: AdminSystemRoute,
   AdminTenantsRoute: AdminTenantsRoute,
+  AdminBillingInvoicesRoute: AdminBillingInvoicesRoute,
+  AdminBillingOrdersRoute: AdminBillingOrdersRoute,
+  AdminBillingOverviewRoute: AdminBillingOverviewRoute,
+  AdminBillingProductsRoute: AdminBillingProductsRoute,
+  AdminBillingResellersRoute: AdminBillingResellersRoute,
+  AdminBillingSubscriptionsRoute: AdminBillingSubscriptionsRoute,
   AdminFleetNodesRoute: AdminFleetNodesRoute,
   AdminOpsAuditRoute: AdminOpsAuditRoute,
   AdminOpsRolloutsRoute: AdminOpsRolloutsRoute,
@@ -229,9 +526,34 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface AppRouteChildren {
+  AppFeedsRoute: typeof AppFeedsRoute
+  AppInvoicesRoute: typeof AppInvoicesRoute
+  AppMembersRoute: typeof AppMembersRoute
+  AppOrdersRoute: typeof AppOrdersRoute
+  AppStoreRoute: typeof AppStoreRoute
+  AppSubscriptionRoute: typeof AppSubscriptionRoute
+  AppWalletRoute: typeof AppWalletRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppFeedsRoute: AppFeedsRoute,
+  AppInvoicesRoute: AppInvoicesRoute,
+  AppMembersRoute: AppMembersRoute,
+  AppOrdersRoute: AppOrdersRoute,
+  AppStoreRoute: AppStoreRoute,
+  AppSubscriptionRoute: AppSubscriptionRoute,
+  AppWalletRoute: AppWalletRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

@@ -402,7 +402,7 @@ func (s *Store) UpdateAccount(ctx context.Context, id string, name string, statu
 		`UPDATE accounts
 		 SET name = COALESCE(NULLIF($2, ''), name),
 		     status = COALESCE(NULLIF($3, ''), status),
-		     billing_email = CASE WHEN $4 IS NULL THEN billing_email ELSE $4 END,
+		     billing_email = CASE WHEN $4::text IS NULL THEN billing_email ELSE $4::text END,
 		     updated_at = now()
 		 WHERE id = $1
 		 RETURNING id::text, type, name, slug, status, billing_email, COALESCE(default_tenant_id::text, ''), created_at`,
