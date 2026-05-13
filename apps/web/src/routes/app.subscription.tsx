@@ -1,5 +1,6 @@
 import {
   Alert,
+  Group,
   Paper,
   SimpleGrid,
   Stack,
@@ -83,10 +84,10 @@ function AppSubscriptionPage() {
               unit="feeds"
             />
           </SimpleGrid>
-          <Text size="sm">
-            Current lifecycle state:{" "}
+          <Group gap="xs">
+            <Text size="sm">Current lifecycle state:</Text>
             <OrderStatusBadge status={subscription.status} />
-          </Text>
+          </Group>
         </Stack>
       </Paper>
     </Stack>

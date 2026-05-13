@@ -1,11 +1,11 @@
-import { Alert, Stack, Text, Title } from "@mantine/core";
 import { DataTable } from "@hugeedge/ui";
+import { Alert, Stack, Text, Title } from "@mantine/core";
 import { createFileRoute } from "@tanstack/react-router";
 import { OrderStatusBadge } from "../components/OrderStatusBadge";
 import {
   backendPendingCopy,
-  operatorBillingFixtures,
   type OrderFixture,
+  operatorBillingFixtures,
 } from "../lib/billing-fixtures";
 
 export const Route = createFileRoute("/admin/billing/orders")({

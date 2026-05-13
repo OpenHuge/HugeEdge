@@ -31,7 +31,16 @@ import {
 import { queryClient } from "../lib/query-client";
 import { queryKeys } from "../lib/session";
 
-type NodeRow = Awaited<ReturnType<typeof api.nodes>>[number] & {
+type ApiNode = Awaited<ReturnType<typeof api.nodes>>[number];
+
+type NodeRow = Omit<
+  ApiNode,
+  | "agentVersion"
+  | "currentConfigVersion"
+  | "desiredConfigVersion"
+  | "lastApplyStatus"
+  | "runtimeVersion"
+> & {
   healthStatus: string;
   currentConfigVersion: string;
   desiredConfigVersion: string;
@@ -343,9 +352,7 @@ function NodesPage() {
             <Button variant="subtle" onClick={rolloutDisclosure.close}>
               Cancel
             </Button>
-            <Button disabled>
-              Create Rollout
-            </Button>
+            <Button disabled>Create Rollout</Button>
           </Group>
         </Stack>
       </Modal>

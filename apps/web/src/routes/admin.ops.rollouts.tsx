@@ -1,3 +1,4 @@
+import { DataTable } from "@hugeedge/ui";
 import {
   Alert,
   Button,
@@ -8,7 +9,6 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { DataTable } from "@hugeedge/ui";
 import { useDisclosure } from "@mantine/hooks";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -38,7 +38,8 @@ const rolloutFixtures: RolloutFixture[] = [
     healthStatus: "online",
     createdAt: "2026-04-21T00:00:00Z",
     completedAt: "2026-04-21T00:03:00Z",
-    lastApplyMessage: "Config applied cleanly across baseline adapter settings.",
+    lastApplyMessage:
+      "Config applied cleanly across baseline adapter settings.",
     config: { mode: "baseline", profile: "stable" },
   },
   {

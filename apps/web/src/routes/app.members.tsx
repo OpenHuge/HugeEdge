@@ -1,10 +1,10 @@
-import { Alert, Stack, Text, Title } from "@mantine/core";
 import { DataTable } from "@hugeedge/ui";
+import { Alert, Stack, Text, Title } from "@mantine/core";
 import { createFileRoute } from "@tanstack/react-router";
 import { OrderStatusBadge } from "../components/OrderStatusBadge";
 import {
-  selfServiceBillingFixtures,
   type MemberFixture,
+  selfServiceBillingFixtures,
 } from "../lib/billing-fixtures";
 
 export const Route = createFileRoute("/app/members")({

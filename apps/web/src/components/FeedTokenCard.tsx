@@ -57,7 +57,8 @@ export function FeedTokenCard({ feed }: { feed: FeedFixture }) {
 
         <Group justify="space-between" align="center">
           <Text size="sm" c="dimmed">
-            Rotate and revoke stay disabled until Track A exposes feed mutations.
+            Rotate and revoke stay disabled until Track A exposes feed
+            mutations.
           </Text>
           <Group>
             <Button variant="default" disabled>

@@ -1,26 +1,25 @@
+import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  Building2,
   CreditCard,
   FileStack,
   Files,
+  Gauge,
   GaugeCircle,
-  Building2,
+  HardDrive,
   House,
+  ListChecks,
   Package,
   Receipt,
+  RotateCcw,
   Rss,
+  Settings,
   ShoppingBag,
   ShoppingCart,
   Users,
   Wallet,
-  Gauge,
-  HardDrive,
-  ListChecks,
-  RotateCcw,
-  Settings,
 } from "lucide-react";
-
-import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
   to: string;

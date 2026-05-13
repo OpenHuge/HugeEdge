@@ -1,5 +1,5 @@
-import { Alert, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import { DataTable } from "@hugeedge/ui";
+import { Alert, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import { createFileRoute } from "@tanstack/react-router";
 import { OrderStatusBadge } from "../components/OrderStatusBadge";
 import {
@@ -75,8 +75,9 @@ function AdminBillingResellersPage() {
           <Stack gap={4}>
             <Title order={4}>Settlement Rules</Title>
             <Text size="sm">
-              Resellers can prepay, create customer accounts, transfer customers,
-              issue recharge codes, and receive monthly settlement statements.
+              Resellers can prepay, create customer accounts, transfer
+              customers, issue recharge codes, and receive monthly settlement
+              statements.
             </Text>
           </Stack>
           <Text size="sm" c="dimmed">

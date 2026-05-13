@@ -1,5 +1,5 @@
-import { Badge, Group, Text } from "@mantine/core";
 import { MetricCard } from "@hugeedge/ui";
+import { Badge, Group, Text } from "@mantine/core";
 
 export function BillingMetricCard({
   label,

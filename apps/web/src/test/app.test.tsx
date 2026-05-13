@@ -303,9 +303,7 @@ describe("web app routes", () => {
 
     renderApp(path);
 
-    expect(
-      await screen.findByRole("heading", { name: heading }),
-    ).toBeVisible();
+    expect(await screen.findByRole("heading", { name: heading })).toBeVisible();
   });
 
   it.each([
@@ -327,8 +325,6 @@ describe("web app routes", () => {
 
     renderApp(path);
 
-    expect(
-      await screen.findByRole("heading", { name: heading }),
-    ).toBeVisible();
+    expect(await screen.findByRole("heading", { name: heading })).toBeVisible();
   });
 });

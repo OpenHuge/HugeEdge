@@ -116,25 +116,29 @@ export const operatorBillingFixtures = {
       {
         label: "Monthly Recurring Revenue",
         value: "$184,200",
-        detail: "Hybrid B2B + B2C recurring base across 612 effective subscriptions.",
+        detail:
+          "Hybrid B2B + B2C recurring base across 612 effective subscriptions.",
         tone: "green" as const,
       },
       {
         label: "Prepaid Wallet Float",
         value: "$91,480",
-        detail: "Combined reseller and direct-account prepaid balance awaiting consumption.",
+        detail:
+          "Combined reseller and direct-account prepaid balance awaiting consumption.",
         tone: "blue" as const,
       },
       {
         label: "Past-Due Exposure",
         value: "$18,920",
-        detail: "Invoices in grace, overdue, or chargeback review across manual rails.",
+        detail:
+          "Invoices in grace, overdue, or chargeback review across manual rails.",
         tone: "yellow" as const,
       },
       {
         label: "Recharge Code Inventory",
         value: "1,248",
-        detail: "Unredeemed recharge codes across reseller batches and direct promotions.",
+        detail:
+          "Unredeemed recharge codes across reseller batches and direct promotions.",
         tone: "gray" as const,
       },
     ],
@@ -155,7 +159,8 @@ export const operatorBillingFixtures = {
           id: "sku-personal-base",
           name: "Personal Base",
           type: "base_subscription",
-          entitlementSummary: "1 seat · 300 GB traffic · 1 feed · standard support",
+          entitlementSummary:
+            "1 seat · 300 GB traffic · 1 feed · standard support",
           priceVersions: [
             {
               id: "pv-personal-web-usd",
@@ -203,13 +208,15 @@ export const operatorBillingFixtures = {
       id: "prod-team",
       name: "Team",
       audience: "Organization",
-      summary: "Operator-managed plan with seats, higher feed allowance, and connector packs.",
+      summary:
+        "Operator-managed plan with seats, higher feed allowance, and connector packs.",
       skus: [
         {
           id: "sku-team-base",
           name: "Team Base",
           type: "base_subscription",
-          entitlementSummary: "10 seats · 4 TB traffic · 3 feeds · SSO-ready controls",
+          entitlementSummary:
+            "10 seats · 4 TB traffic · 3 feeds · SSO-ready controls",
           priceVersions: [
             {
               id: "pv-team-web-usd",
@@ -237,7 +244,8 @@ export const operatorBillingFixtures = {
           id: "sku-team-seat-pack",
           name: "Seat Pack 5",
           type: "seat_pack",
-          entitlementSummary: "Adds 5 billable seats without changing base plan",
+          entitlementSummary:
+            "Adds 5 billable seats without changing base plan",
           priceVersions: [
             {
               id: "pv-team-seat-usd",
@@ -257,13 +265,15 @@ export const operatorBillingFixtures = {
       id: "prod-business",
       name: "Business",
       audience: "Organization / reseller-managed",
-      summary: "High-traffic plan with reserved capacity and settlement-aware reseller pricing.",
+      summary:
+        "High-traffic plan with reserved capacity and settlement-aware reseller pricing.",
       skus: [
         {
           id: "sku-business-base",
           name: "Business Base",
           type: "base_subscription",
-          entitlementSummary: "50 seats · 20 TB traffic · 6 feeds · premium support",
+          entitlementSummary:
+            "50 seats · 20 TB traffic · 6 feeds · premium support",
           priceVersions: [
             {
               id: "pv-business-direct-usd",
@@ -304,7 +314,8 @@ export const operatorBillingFixtures = {
       trafficTotalGb: 20_000,
       feedCountUsed: 4,
       feedCountTotal: 6,
-      notice: "Auto-renew enabled; reseller discount inherited from Orbit Channels.",
+      notice:
+        "Auto-renew enabled; reseller discount inherited from Orbit Channels.",
     },
     {
       id: "sub-team-summit",
@@ -334,7 +345,8 @@ export const operatorBillingFixtures = {
       trafficTotalGb: 300,
       feedCountUsed: 1,
       feedCountTotal: 1,
-      notice: "Trial converts automatically unless wallet or card payment fails.",
+      notice:
+        "Trial converts automatically unless wallet or card payment fails.",
     },
   ] satisfies SubscriptionFixture[],
   orders: [
@@ -358,7 +370,8 @@ export const operatorBillingFixtures = {
       paymentChannel: "bank_transfer",
       total: "$184",
       createdAt: "2026-04-18 08:15 UTC",
-      approvalNote: "Waiting for operator approve-payment after settlement trace lands.",
+      approvalNote:
+        "Waiting for operator approve-payment after settlement trace lands.",
     },
     {
       id: "ord-2031",
@@ -369,7 +382,8 @@ export const operatorBillingFixtures = {
       paymentChannel: "wallet_balance",
       total: "$2,900",
       createdAt: "2026-04-15 02:11 UTC",
-      approvalNote: "Inventory issuance batched; export artifact lands after Track A webhook sync.",
+      approvalNote:
+        "Inventory issuance batched; export artifact lands after Track A webhook sync.",
     },
   ] satisfies OrderFixture[],
   resellers: [
@@ -493,7 +507,8 @@ export const selfServiceBillingFixtures = {
       paymentChannel: "bank_transfer",
       total: "$184",
       createdAt: "2026-04-18 08:15 UTC",
-      approvalNote: "Payment will activate after finance confirms the transfer.",
+      approvalNote:
+        "Payment will activate after finance confirms the transfer.",
     },
     {
       id: "ord-1972",
@@ -571,7 +586,7 @@ export const selfServiceBillingFixtures = {
       usageSummary: "2.8 TB / 4 TB",
       expiresAt: "2026-04-27T00:00:00Z",
       lastUsedAt: "2026-04-21T05:41:00Z",
-      etag: "W/\"team-primary-2744\"",
+      etag: 'W/"team-primary-2744"',
       deviceBound: false,
       headers: [
         { name: "X-HE-Plan", value: "Team Base" },
@@ -591,7 +606,7 @@ export const selfServiceBillingFixtures = {
       usageSummary: "540 GB / 4 TB",
       expiresAt: "2026-04-27T00:00:00Z",
       lastUsedAt: "2026-04-20T16:08:00Z",
-      etag: "W/\"team-branch-812\"",
+      etag: 'W/"team-branch-812"',
       deviceBound: true,
       headers: [
         { name: "X-HE-Plan", value: "Team Base" },

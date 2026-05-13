@@ -23,8 +23,8 @@ function AppWalletPage() {
       <Stack gap={4}>
         <Title order={2}>Wallet</Title>
         <Text c="dimmed">
-          Prepaid balance, pending credits, and top-up readiness for wallet-first
-          flows.
+          Prepaid balance, pending credits, and top-up readiness for
+          wallet-first flows.
         </Text>
       </Stack>
 

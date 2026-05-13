@@ -60,14 +60,26 @@ function AdminBillingOverviewPage() {
             <Title order={4}>Lifecycle Snapshot</Title>
             <Group gap="sm">
               <Badge color="green" variant="light">
-                {subscriptions.filter((subscription) => subscription.status === "active").length} active
+                {
+                  subscriptions.filter(
+                    (subscription) => subscription.status === "active",
+                  ).length
+                }{" "}
+                active
               </Badge>
               <Badge color="blue" variant="light">
-                {subscriptions.filter((subscription) => subscription.status === "trialing").length} trialing
+                {
+                  subscriptions.filter(
+                    (subscription) => subscription.status === "trialing",
+                  ).length
+                }{" "}
+                trialing
               </Badge>
               <Badge color="yellow" variant="light">
                 {
-                  subscriptions.filter((subscription) => subscription.status === "grace").length
+                  subscriptions.filter(
+                    (subscription) => subscription.status === "grace",
+                  ).length
                 }{" "}
                 in grace
               </Badge>
@@ -84,9 +96,15 @@ function AdminBillingOverviewPage() {
           <Stack gap="md">
             <Title order={4}>Backlog Signals</Title>
             <Text size="sm">
-              {orders.filter((order) => order.paymentStatus === "pending").length}{" "}
+              {
+                orders.filter((order) => order.paymentStatus === "pending")
+                  .length
+              }{" "}
               orders are blocked on manual rails,{" "}
-              {invoices.filter((invoice) => invoice.status === "overdue").length}{" "}
+              {
+                invoices.filter((invoice) => invoice.status === "overdue")
+                  .length
+              }{" "}
               invoices are overdue, and {resellers.length} resellers currently
               hold prepaid balance.
             </Text>

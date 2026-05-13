@@ -30,8 +30,8 @@ function AdminBillingProductsPage() {
       </Stack>
 
       <Alert color="blue" variant="light">
-        Product create/edit actions will connect to `/v1/admin/catalog/*`
-        after Track A lands. This page currently reflects local fixture state.
+        Product create/edit actions will connect to `/v1/admin/catalog/*` after
+        Track A lands. This page currently reflects local fixture state.
       </Alert>
 
       {operatorBillingFixtures.products.map((product) => (
